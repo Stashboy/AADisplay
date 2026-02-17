@@ -15,7 +15,7 @@ android {
         minSdk = 31
         targetSdk = 36
         versionCode = 3000  // 设置一个很大的版本号，避免 LSPosed 提示更新
-        versionName = "0.21#15.1+portrait"
+        versionName = "0.22#16.1+portrait"
         buildConfigField("long", "BUILD_TIME", buildTime.toString())
     }
 

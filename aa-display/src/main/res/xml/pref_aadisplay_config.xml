@@ -119,13 +119,6 @@
     </PreferenceCategory>
 
     <PreferenceCategory
-        app:key="CategoryPhysicalBtn"
-        app:title="Physical Buttons"
-        app:summary="TODO"
-        app:iconSpaceReserved="false">
-    </PreferenceCategory>
-
-    <PreferenceCategory
         app:key="CategoryAndroidAuto"
         app:title="Android Auto Settings"
         app:summary="[com.google.android."

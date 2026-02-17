@@ -7,8 +7,8 @@
     </string-array>
 
     <string-array name="ime_policy_keys">
-        <item>虚拟屏</item>
-        <item>主屏</item>
+        <item>Virtual display</item>
+        <item>Primary display</item>
     </string-array>
 
     <string-array name="ime_policy_values">
