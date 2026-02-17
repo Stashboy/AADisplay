@@ -76,18 +76,7 @@ object AaUiHook: AaHook() {
         if (classes.isEmpty() || classes.size > 1) {
             throw NoSuchMethodException("AaUiHook: not found LayoutInfo class：${classes.size}")
         }
-        layoutInfoConstructor = findConstructor(classes[0].name) {
-            //int i, int i2, int i3, int i4, boolean z, boolean z2, jby jbyVar, boolean z3
-            parameterCount == 8
-            && parameterTypes[0] == Int::class.javaPrimitiveType       //layoutResourceId
-            && parameterTypes[1] == Int::class.javaPrimitiveType       //displayWidthDp
-            && parameterTypes[2] == Int::class.javaPrimitiveType       //displayHeightDp
-            && parameterTypes[3] == Int::class.javaPrimitiveType       //layoutType
-            && parameterTypes[4] == Boolean::class.javaPrimitiveType   //isRightHandDrive
-            && parameterTypes[5] == Boolean::class.javaPrimitiveType   //hasVerticalRail
-            //&& parameterTypes[6] == Object                           //carDisplayUiInfo
-            && parameterTypes[7] == Boolean::class.javaPrimitiveType   //isDriverAlignedDashboard
-        }
+        layoutInfoConstructor = resolveLayoutInfoConstructor(classes[0].name)
 
         try{
             startMethod = loadClass("com.google.android.projection.gearhead.service.CarSystemUiControllerService").staticMethod("a", null, argTypes(Intent::class.java))
@@ -142,14 +131,49 @@ object AaUiHook: AaHook() {
     private fun hookLayout() {
         layoutInfoConstructor.hookAfter { param -> log(tagName, param.thisObject.toString()) }
         layoutInfoConstructor.hookBefore { param ->
+            if (param.args.size < 5) return@hookBefore
             when(param.args[3] as Int){ //layoutType
                 8,9,10 -> return@hookBefore;
             }
             var isRightHandDrive = param.args[4] as Boolean // isRightHandDrive left false, right:true
             param.args[0] = if(isRightHandDrive) resLayoutRightResourceId else resLayoutLeftResourceId
             param.args[3] = if(isRightHandDrive) 4 else 3//layoutType left:3, right:4
-            param.args[5] = true //hasVerticalRail
+            if (param.args.size > 5 && param.args[5] is Boolean) {
+                param.args[5] = true //hasVerticalRail
+            }
         }
+    }
+
+    private fun resolveLayoutInfoConstructor(className: String): Constructor<*> {
+        // New AA versions frequently change obfuscated ctor tails; keep only stable prefix checks.
+        val strictMatch = runCatching {
+            findConstructor(className) {
+                parameterCount == 8
+                    && parameterTypes[0] == Int::class.javaPrimitiveType
+                    && parameterTypes[1] == Int::class.javaPrimitiveType
+                    && parameterTypes[2] == Int::class.javaPrimitiveType
+                    && parameterTypes[3] == Int::class.javaPrimitiveType
+                    && parameterTypes[4] == Boolean::class.javaPrimitiveType
+                    && parameterTypes[5] == Boolean::class.javaPrimitiveType
+                    && parameterTypes[7] == Boolean::class.javaPrimitiveType
+            }
+        }.getOrNull()
+        if (strictMatch != null) return strictMatch
+
+        val clazz = loadClass(className)
+        val fallback = clazz.declaredConstructors.firstOrNull { ctor ->
+            val p = ctor.parameterTypes
+            p.size >= 5
+                && p[0] == Int::class.javaPrimitiveType
+                && p[1] == Int::class.javaPrimitiveType
+                && p[2] == Int::class.javaPrimitiveType
+                && p[3] == Int::class.javaPrimitiveType
+                && p[4] == Boolean::class.javaPrimitiveType
+        } ?: throw NoSuchMethodException("AaUiHook: not found compatible LayoutInfo constructor for $className")
+
+        fallback.isAccessible = true
+        log(tagName, "AaUiHook: fallback constructor selected, paramCount=${fallback.parameterCount}")
+        return fallback
     }
 
     private fun hookFacetBar(config: SharedPreferences) {
