@@ -1,14 +1,14 @@
 # AADisplay-Beta
 
-[![AADisplay](https://img.shields.io/badge/AADisplay-Project-blue?logo=github)](https://github.com/bikekoala/AADisplay-Beta)
-[![GitHub Release](https://img.shields.io/github/v/release/Xposed-Modules-Repo/io.github.nitsuya.aa.display)](https://github.com/Xposed-Modules-Repo/io.github.nitsuya.aa.display/releases)
+[![AADisplay-Beta](https://img.shields.io/badge/AADisplay-Project-blue?logo=github)](https://github.com/bikekoala/AADisplay-Beta)
+[![GitHub Release](https://img.shields.io/github/v/release/Xposed-Modules-Repo/io.github.bikekoala.aa.display.beta)](https://github.com/Xposed-Modules-Repo/io.github.bikekoala.aa.display.beta/releases)
 ![Xposed Module](https://img.shields.io/badge/Xposed-Module-blue)
 ![Android SDK min 31](https://img.shields.io/badge/Android%20SDK-%3E%3D%2031-brightgreen?logo=android)
 ![Android SDK target 33](https://img.shields.io/badge/Android%20SDK-target%2033-brightgreen?logo=android)
 
 ## Overview
 
-This repository is a personal fork of [`Nitsuya/AADisplay`](https://github.com/Nitsuya/AADisplay).
+This repository is a personal fork of [`Nitsuya/AADisplay`](https://github.com/Nitsuya/AADisplay)
 
 AADisplay is an Xposed / LSPosed module that lets Android Auto display (mirror) almost any app using a VirtualDisplay-based approach.
 
