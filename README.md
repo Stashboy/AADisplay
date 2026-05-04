@@ -37,11 +37,6 @@ Production-ready fork of [Nitsuya/AADisplay](https://github.com/Nitsuya/AADispla
 ./gradlew :aa-display:assembleRelease
 ```
 
-## Notes
-
-- Project excludes personal signing material and local machine paths.
-- If release signing is needed, provide your own keystore and `KEY_ANDROID` environment variable.
-
 ## License
 
 Inherited from upstream. See [LICENSE](LICENSE).
