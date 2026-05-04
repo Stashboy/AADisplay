@@ -353,6 +353,7 @@ class DisplayWindow(
     suspend fun onResume(width: Int, height: Int){
         mDisplayWidth = width
         mDisplayHeight = height
+        mMirrorBinding?.tvVirtualDisplayInfo?.text = "$mDisplayWidth*$mDisplayHeight,$mDensityDpi"
         interactiveMonitor.init()
         mDestroyJob?.cancelAndJoin()
         updateDipslaySize()

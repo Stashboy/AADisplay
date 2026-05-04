@@ -1,14 +1,12 @@
 package io.github.nitsuya.aa.display.xposed.hook.aa
 
 import android.content.SharedPreferences
-import android.content.pm.InstallSourceInfo
 import android.graphics.Point
 import android.graphics.Rect
 import android.util.Size
-import com.github.kyuubiran.ezxhelper.utils.findConstructor
-import com.github.kyuubiran.ezxhelper.utils.findMethod
 import com.github.kyuubiran.ezxhelper.utils.hookAfter
 import com.github.kyuubiran.ezxhelper.utils.hookBefore
+import com.github.kyuubiran.ezxhelper.utils.loadClass
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import io.github.nitsuya.aa.display.util.AADisplayConfig
 import io.github.nitsuya.aa.display.xposed.hook.AaHook
@@ -17,7 +15,7 @@ import org.luckypray.dexkit.DexKitBridge
 import org.luckypray.dexkit.query.enums.StringMatchType
 import java.lang.reflect.Constructor
 
-object AaDpiHook: AaHook() {
+object AaDpiHook : AaHook() {
     override val tagName: String = "AAD_AaDpiHook"
 
     private lateinit var displayParamsConstructor: Constructor<*>
@@ -32,52 +30,54 @@ object AaDpiHook: AaHook() {
             searchPackages = listOf("")
             matcher {
                 usingStrings {
-                    add(
-                        "DisplayParams(selectedIndex=",
-                        StringMatchType.StartsWith,
-                        false
-                    )
+                    add("DisplayParams(selectedIndex=", StringMatchType.StartsWith, false)
                 }
             }
         }
         if (classes.isEmpty() || classes.size > 1) {
-            throw NoSuchMethodException("AaDpiHook: not found DisplayParams class：${classes.size}")
+            throw NoSuchMethodException("AaDpiHook: not found DisplayParams class: ${classes.size}")
         }
-        displayParamsConstructor = findConstructor(classes[0].name) {
-            //int i, int i2, int i3, int i4, int i5, int i6, int i7, int i8, int i9, float f, int i10, float f2, Size size, Rect rect, Rect rect2, CarDisplayUiFeatures carDisplayUiFeatures, int i11
-            parameterCount == 18
-            && parameterTypes[0]        == Int::class.javaPrimitiveType      //selectedIndex
-            && parameterTypes[1]        == Int::class.javaPrimitiveType      //codecWidth
-            && parameterTypes[2]        == Int::class.javaPrimitiveType      //codecHeight
-            && parameterTypes[3]        == Int::class.javaPrimitiveType      //fps
-            && parameterTypes[4]        == Int::class.javaPrimitiveType      //dispWidth
-            && parameterTypes[5]        == Int::class.javaPrimitiveType      //dispHeight
-            && parameterTypes[6]        == Int::class.javaPrimitiveType      //dispLeft
-            && parameterTypes[7]        == Int::class.javaPrimitiveType      //dispTop
-            && parameterTypes[8]        == Int::class.javaPrimitiveType      //densityDpi
-            && parameterTypes[9]        == Float::class.javaPrimitiveType    //pixelAspectRatio
-            && parameterTypes[10]       == Int::class.javaPrimitiveType     //depth
-            && parameterTypes[11]       == Float::class.javaPrimitiveType   //scaledPixelAspectRatio
-            && parameterTypes[12]       == Size::class.java                 //scaledDimensions
-            && parameterTypes[13]       == Rect::class.java                 //stableInsets
-            && parameterTypes[14]       == Rect::class.java                 //initialInsets
-            && parameterTypes[15]       == List::class.java                //Type? cutouts
-            && parameterTypes[16].name  == "com.google.android.gms.car.display.CarDisplayUiFeatures"
-            && parameterTypes[17]       == Int::class.javaPrimitiveType      //unknown 65535
 
-        }
-        carDisplayConstructor = findConstructor("com.google.android.gms.car.display.CarDisplay") {
-            parameterCount == 9
-            && parameterTypes[0].name == "com.google.android.gms.car.display.CarDisplayId"
-            && parameterTypes[1] == Int::class.javaPrimitiveType    //carDisplayType MAIN-0,CLUSTER-1,AUXILIARY-2,UNKNOWN-3,
-            && parameterTypes[2] == Int::class.javaPrimitiveType    //displayDpi
-            && parameterTypes[3] == Point::class.java               //displayDimensions
-            && parameterTypes[4] == Rect::class.java                //stableInsets
-            && parameterTypes[5] == Rect::class.java                //contentInsets
-            && parameterTypes[6] == List::class.java                //Type? cutouts
-            && parameterTypes[7] == Int::class.javaPrimitiveType    //initialContentType UNKNOWN-0,NAVIGATION-1,TURN_CARD-2
-            && parameterTypes[8] == String::class.java              //configurationId
-        }
+        val displayParamsClass = loadClass(classes[0].name)
+        displayParamsConstructor = displayParamsClass.declaredConstructors.firstOrNull { ctor ->
+            val p = ctor.parameterTypes
+            p.size >= 18 &&
+                p[0] == Int::class.javaPrimitiveType &&
+                p[1] == Int::class.javaPrimitiveType &&
+                p[2] == Int::class.javaPrimitiveType &&
+                p[3] == Int::class.javaPrimitiveType &&
+                p[4] == Int::class.javaPrimitiveType &&
+                p[5] == Int::class.javaPrimitiveType &&
+                p[6] == Int::class.javaPrimitiveType &&
+                p[7] == Int::class.javaPrimitiveType &&
+                p[8] == Int::class.javaPrimitiveType &&
+                p[9] == Float::class.javaPrimitiveType &&
+                p[10] == Int::class.javaPrimitiveType &&
+                p[11] == Float::class.javaPrimitiveType &&
+                p[12] == Size::class.java &&
+                p[13] == Rect::class.java &&
+                p[14] == Rect::class.java &&
+                List::class.java.isAssignableFrom(p[15]) &&
+                p[16].name == "com.google.android.gms.car.display.CarDisplayUiFeatures" &&
+                p.last() == Int::class.javaPrimitiveType
+        } ?: throw NoSuchMethodException("AaDpiHook: not found compatible DisplayParams constructor")
+        displayParamsConstructor.isAccessible = true
+
+        val carDisplayClass = loadClass("com.google.android.gms.car.display.CarDisplay")
+        carDisplayConstructor = carDisplayClass.declaredConstructors.firstOrNull { ctor ->
+            val p = ctor.parameterTypes
+            (p.size == 9 || p.size == 10) &&
+                p[0].name == "com.google.android.gms.car.display.CarDisplayId" &&
+                p[1] == Int::class.javaPrimitiveType &&
+                p[2] == Int::class.javaPrimitiveType &&
+                p[3] == Point::class.java &&
+                p[4] == Rect::class.java &&
+                p[5] == Rect::class.java &&
+                List::class.java.isAssignableFrom(p[6]) &&
+                p[7] == Int::class.javaPrimitiveType &&
+                p[8] == String::class.java
+        } ?: throw NoSuchMethodException("AaDpiHook: not found compatible CarDisplay constructor")
+        carDisplayConstructor.isAccessible = true
     }
 
     override fun hook(config: SharedPreferences, lpparam: XC_LoadPackage.LoadPackageParam) {
@@ -94,9 +94,6 @@ object AaDpiHook: AaHook() {
                 }
             }
         }
-
-
     }
-
-
 }
+

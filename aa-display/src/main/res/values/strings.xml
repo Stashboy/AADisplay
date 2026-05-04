@@ -11,4 +11,12 @@
     <string name="need_LSPosed">Need LSPosed</string>
     <string name="not_activated">Not Activated</string>
     <string name="reboot">Reboot</string>
+    <string name="auto_open_title">Auto Open</string>
+    <string name="auto_open_summary">Automatically open app when Android Auto is connected</string>
+    <string name="default_launch_package_title">Default Launch Package</string>
+    <string name="default_launch_package_summary">Package name launched when AADisplay starts</string>
+    <string name="default_launch_package_empty">Default Launch Package cannot be empty</string>
+    <string name="delay_destroy_time_title">Delay Destroy Time</string>
+    <string name="delay_destroy_time_invalid">Delay Destroy Time must be a non-negative number</string>
+    <string name="saved">Saved</string>
 </resources>

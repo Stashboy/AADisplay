@@ -1,37 +1,47 @@
-# AADisplay-Beta
+# AADisplay
 
-[![AADisplay-Beta](https://img.shields.io/badge/AADisplayBeta-Project-blue?logo=github)](https://github.com/bikekoala/AADisplay-Beta)
-[![GitHub Release](https://img.shields.io/github/v/release/Xposed-Modules-Repo/io.github.bikekoala.aa.display.beta)](https://github.com/Xposed-Modules-Repo/io.github.bikekoala.aa.display.beta/releases)
+[![Fork](https://img.shields.io/badge/Fork-Nitsuya%2FAADisplay-blue?logo=github)](https://github.com/Nitsuya/AADisplay)
 ![Xposed Module](https://img.shields.io/badge/Xposed-Module-blue)
 ![Android SDK min 31](https://img.shields.io/badge/Android%20SDK-%3E%3D%2031-brightgreen?logo=android)
-![Android SDK target 33](https://img.shields.io/badge/Android%20SDK-target%2033-brightgreen?logo=android)
+![Android SDK target 36](https://img.shields.io/badge/Android%20SDK-target%2036-brightgreen?logo=android)
 
-## Overview
+Production-ready fork of [Nitsuya/AADisplay](https://github.com/Nitsuya/AADisplay), focused on Android Auto 16.6 compatibility, TaskView stability, and reliable display sizing behavior.
 
-This repository is a personal fork of [`Nitsuya/AADisplay`](https://github.com/Nitsuya/AADisplay)
+## Version
 
-AADisplay is an Xposed / LSPosed module that lets Android Auto display (mirror) almost any app using a VirtualDisplay-based approach.
+- Current module version: `0.23#16.6-r1`
+- See [CHANGELOG.md](CHANGELOG.md) and [RELEASE_NOTES_v0.23.0.md](RELEASE_NOTES_v0.23.0.md)
 
 ## Requirements
 
-- Android 12+ (SDK 31+; Android 10–11 are not officially supported)
-- Rooted device with **LSPosed** (or compatible Xposed environment)
-- Working Android Auto (`com.google.android.projection.gearhead`)
-- Some ROMs may be unstable or crash; use at your own risk.
+- Android 12+ (SDK 31+)
+- Rooted device with LSPosed (or compatible Xposed framework)
+- Android Auto (`com.google.android.projection.gearhead`)
 
-## Basic Usage
+## Quick Start
 
-1. Enable this module in **LSPosed** and select:
-   - **System Framework**
-   - **Android Auto**
-2. Install your preferred launcher and set its package name in the module settings.
-3. Optionally:
-   - Set **DPI** values to improve app UI on the car screen.
-   - Add Android Auto **properties** to hook and tweak AA configuration.
-4. Root is only used for user-configured shell commands; you can deny root if you do not need that feature.
+1. Build and install the APK.
+2. Enable the module in LSPosed for:
+   - Android Auto
+   - System Framework
+3. Reboot device.
+4. Open AADisplay and configure:
+   - Auto Open
+   - Default Launch Package
+   - Delay Destroy Time
 
-For build instructions and full details, please refer to the original project: [`Nitsuya/AADisplay`](https://github.com/Nitsuya/AADisplay).
+## Build
+
+```bash
+./gradlew :aa-display:assembleDebug
+./gradlew :aa-display:assembleRelease
+```
+
+## Notes
+
+- Project excludes personal signing material and local machine paths.
+- If release signing is needed, provide your own keystore and `KEY_ANDROID` environment variable.
 
 ## License
 
-Same license as the upstream project. See `LICENSE` for details.
+Inherited from upstream. See [LICENSE](LICENSE).

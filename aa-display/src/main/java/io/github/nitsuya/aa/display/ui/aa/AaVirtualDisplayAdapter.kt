@@ -40,6 +40,7 @@ class AaVirtualDisplayAdapter(
 ) {
     companion object {
         const val TAG = "AADisplay_AaVirtualDisplayAdapter"
+        private const val WINDOWING_MODE_PINNED = 2
 
         /** Package names to ignore in recent task list */
         private val IGNORE_RECENT_PACKAGE = setOf(
@@ -51,14 +52,16 @@ class AaVirtualDisplayAdapter(
     /** Default launch package name: the app package to launch when virtual display is created, can be null */
     private var mLauncherPackage = AADisplayConfig.LauncherPackage.get(CoreManagerService.config)
     
-    /** Home package name: the app package to launch when Home key is pressed */
-    private var mHomePackage = AADisplayConfig.HomePackage.get(CoreManagerService.config)
+    /** Home package follows launcher package; separate HomePackage config is deprecated. */
+    private var mHomePackage = mLauncherPackage
     
     /** Task ID of the Home package */
     private var mHomeTaskId: Int? = null
     
     /** Task ID of the default launch package */
     private var mLauncherPackageTaskId: Int? = null
+    private var mIsDestroying = false
+    private val mTrackedPackageUsers = linkedMapOf<String, MutableSet<Int>>()
     private val mTaskStackListener = TaskStackListener()
     var mDisplayId = Display.INVALID_DISPLAY
     var mDensityDpi: Int = 0
@@ -102,6 +105,10 @@ class AaVirtualDisplayAdapter(
 
     @SuppressLint("WrongConstant")
     fun onConnected(width: Int, height: Int, densityDpi: Int, onVirtualDisplayCreated: ((Int) -> Unit)) {
+        mIsDestroying = false
+        mTrackedPackageUsers.clear()
+        trackPackage(mLauncherPackage, 0)
+        trackPackage(mHomePackage, 0)
         val indent = Binder.clearCallingIdentity()
         try {
             mVirtualDisplay = Instances.displayManager.createVirtualDisplay(
@@ -175,20 +182,52 @@ class AaVirtualDisplayAdapter(
         mDensityDpi = densityDpi
         // Reload configuration
         mLauncherPackage = AADisplayConfig.LauncherPackage.get(CoreManagerService.config)
-        mHomePackage = AADisplayConfig.HomePackage.get(CoreManagerService.config)
+        mHomePackage = mLauncherPackage
+        trackPackage(mLauncherPackage, 0)
+        trackPackage(mHomePackage, 0)
     }
 
     fun onDestroy() {
+        mIsDestroying = true
+        trackPackage(mLauncherPackage, 0)
+        trackPackage(mHomePackage, 0)
         tryOrNull { Instances.iActivityTaskManager.unregisterTaskStackListener(mTaskStackListener) }
         tryOrNull {
-            Instances.iActivityTaskManager.apply {
-                getAllRootTaskInfosOnDisplay(mDisplayId).forEach{ task ->
-                    removeTask(task.taskId)
-                    task.topActivity?.packageName.let { pkgName ->
-                        Instances.activityManagerHidden.forceStopPackageAsUser(pkgName, task.getObjectAs("userId", Int::class.javaPrimitiveType) as Int)
+            val taskInfos = Instances.iActivityTaskManager.getAllRootTaskInfosOnDisplay(mDisplayId)
+            taskInfos.forEach { task ->
+                trackPackageFromTask(task)
+                removeTask(task.taskId)
+            }
+            mTrackedPackageUsers
+                .filterKeys { pkg -> pkg.isNotBlank() && pkg != BuildConfig.APPLICATION_ID }
+                .forEach { (pkg, userIds) ->
+                    userIds.ifEmpty { mutableSetOf(0) }.forEach { userId ->
+                        try {
+                            Instances.activityManagerHidden.forceStopPackageAsUser(pkg, userId)
+                            log(TAG, "onDestroy forceStop: $pkg (user=$userId)")
+                        } catch (e: Throwable) {
+                            log(TAG, "onDestroy forceStop failed: $pkg (user=$userId)", e)
+                        }
                     }
                 }
+            mTrackedPackageUsers.clear()
+        }
+        tryOrNull {
+            if(mDisplayId != Display.INVALID_DISPLAY) {
+                // Second pass after initial removals to catch tasks recreated during teardown races.
+                val remains = Instances.iActivityTaskManager.getAllRootTaskInfosOnDisplay(mDisplayId)
+                remains.forEach { task ->
+                    removeTask(task.taskId)
+                }
             }
+        }
+        // ShellManager may already be dead during teardown; never let this crash system_server.
+        try {
+            mShellManager?.destroyVirtualDisplayAfter()
+        } catch (e: Throwable) {
+            log(TAG, "onDestroy destroyVirtualDisplayAfter ignored:", e)
+        } finally {
+            mShellManager = null
         }
         tryOrNull { CoreManagerService.systemContext.unbindService(mServiceConnection) }
         mSurfaceControls.values.forEach { it.release() }
@@ -197,7 +236,6 @@ class AaVirtualDisplayAdapter(
         mVirtualDisplay.release()
         mDisplayId = Display.INVALID_DISPLAY
         mDensityDpi = 0
-        mShellManager?.destroyVirtualDisplayAfter()
     }
 
     fun onTouch(event: MotionEvent) = injectInputEvent(event)
@@ -271,6 +309,12 @@ class AaVirtualDisplayAdapter(
      */
     fun startLauncher(){
         startHomeLauncher()
+        // On some ROMs, moving Home to front auto-pins the previous video task (PiP).
+        // Clean up pinned tasks on the AA virtual display so Home returns to a normal state.
+        clearPinnedTasksOnDisplay("home")
+        Handler(Looper.getMainLooper()).postDelayed({
+            clearPinnedTasksOnDisplay("home-delay")
+        }, 350L)
     }
 
     /**
@@ -409,9 +453,59 @@ class AaVirtualDisplayAdapter(
         )
     }
 
+    private fun clearPinnedTasksOnDisplay(reason: String) {
+        if (mDisplayId == Display.INVALID_DISPLAY) return
+        val tasks = try {
+            Instances.iActivityTaskManager.getAllRootTaskInfosOnDisplay(mDisplayId)
+        } catch (e: Throwable) {
+            log(TAG, "clearPinnedTasksOnDisplay error:", e)
+            return
+        }
+        tasks
+            .filter { taskInfo ->
+                taskInfo.topActivity != null && isPinnedWindowMode(taskInfo)
+            }
+            .forEach { taskInfo ->
+                log(
+                    TAG,
+                    "clearPinnedTasksOnDisplay[$reason]: remove task=${taskInfo.taskId}, top=${taskInfo.topActivity?.flattenToShortString()}"
+                )
+                removeTask(taskInfo.taskId)
+            }
+    }
+
+    private fun isPinnedWindowMode(taskInfo: Any): Boolean {
+        return try {
+            val mode = taskInfo.invokeMethod("getWindowingMode", args(), argTypes()) as? Int
+            mode == WINDOWING_MODE_PINNED
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
     private fun injectInputEvent(event: InputEvent){
         event.invokeMethod("setDisplayId", args(mDisplayId), argTypes(Integer.TYPE))
         Instances.iInputManager.injectInputEvent(event, 0)
+    }
+
+    private fun trackPackage(packageName: String?, userId: Int = 0) {
+        val pkg = packageName?.trim()?.takeIf { it.isNotEmpty() } ?: return
+        mTrackedPackageUsers.getOrPut(pkg) { linkedSetOf() }.add(userId)
+    }
+
+    private fun trackPackageFromTask(taskInfo: Any) {
+        val userId = runCatching {
+            taskInfo.getObjectAs("userId", Int::class.javaPrimitiveType) as? Int
+        }.getOrNull() ?: 0
+        runCatching {
+            taskInfo.getObjectAs("topActivity", ComponentName::class.java) as? ComponentName
+        }.getOrNull()?.packageName?.let { trackPackage(it, userId) }
+        runCatching {
+            taskInfo.getObjectAs("baseActivity", ComponentName::class.java) as? ComponentName
+        }.getOrNull()?.packageName?.let { trackPackage(it, userId) }
+        runCatching {
+            taskInfo.getObjectAs("baseIntent", Intent::class.java) as? Intent
+        }.getOrNull()?.component?.packageName?.let { trackPackage(it, userId) }
     }
 
     /**
@@ -496,6 +590,7 @@ class AaVirtualDisplayAdapter(
          */
         override fun onTaskCreated(taskId: Int, componentName: ComponentName?) {
             val packageName = componentName?.packageName ?: return
+            trackPackage(packageName, 0)
             if(packageName == mHomePackage) {
                 mHomeTaskId = taskId
             } else if(packageName == mLauncherPackage) {
@@ -508,6 +603,14 @@ class AaVirtualDisplayAdapter(
          * If the removed task is the Home package, restart it
          */
         override fun onTaskRemoved(taskId: Int) {
+            if(mIsDestroying) {
+                if(mHomeTaskId == taskId) {
+                    mHomeTaskId = null
+                } else if(mLauncherPackageTaskId == taskId) {
+                    mLauncherPackageTaskId = null
+                }
+                return
+            }
             if(mHomeTaskId == taskId) {
                 mHomeTaskId = null
                 startHomeLauncher()
@@ -525,6 +628,7 @@ class AaVirtualDisplayAdapter(
         override fun onBackPressedOnTaskRoot(taskInfo: ActivityManager.RunningTaskInfo?) {}
         override fun onTaskDisplayChanged(taskId: Int, newDisplayId: Int) {}
         override fun onRecentTaskListUpdated() {}
+        override fun onRecentTaskRemovedForAddTask(taskId: Int) {}
         override fun onRecentTaskListFrozenChanged(frozen: Boolean) {}
         override fun onTaskFocusChanged(taskId: Int, focused: Boolean) {}
         override fun onTaskRequestedOrientationChanged(taskId: Int, requestedOrientation: Int) {}

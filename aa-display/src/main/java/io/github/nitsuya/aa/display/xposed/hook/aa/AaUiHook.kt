@@ -132,12 +132,13 @@ object AaUiHook: AaHook() {
         layoutInfoConstructor.hookAfter { param -> log(tagName, param.thisObject.toString()) }
         layoutInfoConstructor.hookBefore { param ->
             if (param.args.size < 5) return@hookBefore
-            when(param.args[3] as Int){ //layoutType
-                8,9,10 -> return@hookBefore;
-            }
-            var isRightHandDrive = param.args[4] as Boolean // isRightHandDrive left false, right:true
-            param.args[0] = if(isRightHandDrive) resLayoutRightResourceId else resLayoutLeftResourceId
-            param.args[3] = if(isRightHandDrive) 4 else 3//layoutType left:3, right:4
+            val layoutTypeCode = layoutTypeCode(param.args[3] ?: return@hookBefore) ?: return@hookBefore
+            // Skip cluster/auxiliary layouts to avoid overriding non-main surfaces.
+            if (layoutTypeCode in setOf(7, 8, 9)) return@hookBefore
+            val isRightHandDrive = (param.args[4] as? Boolean) == true
+            param.args[0] = if (isRightHandDrive) resLayoutRightResourceId else resLayoutLeftResourceId
+            // Force canonical vertical rail for LHD/RHD.
+            setLayoutTypeArg(param.args, if (isRightHandDrive) 3 else 2)
             if (param.args.size > 5 && param.args[5] is Boolean) {
                 param.args[5] = true //hasVerticalRail
             }
@@ -145,35 +146,50 @@ object AaUiHook: AaHook() {
     }
 
     private fun resolveLayoutInfoConstructor(className: String): Constructor<*> {
-        // New AA versions frequently change obfuscated ctor tails; keep only stable prefix checks.
-        val strictMatch = runCatching {
-            findConstructor(className) {
-                parameterCount == 8
-                    && parameterTypes[0] == Int::class.javaPrimitiveType
-                    && parameterTypes[1] == Int::class.javaPrimitiveType
-                    && parameterTypes[2] == Int::class.javaPrimitiveType
-                    && parameterTypes[3] == Int::class.javaPrimitiveType
-                    && parameterTypes[4] == Boolean::class.javaPrimitiveType
-                    && parameterTypes[5] == Boolean::class.javaPrimitiveType
-                    && parameterTypes[7] == Boolean::class.javaPrimitiveType
-            }
-        }.getOrNull()
-        if (strictMatch != null) return strictMatch
-
+        // Keep only stable shape checks so this works across AA 16.4 and 16.6+.
         val clazz = loadClass(className)
         val fallback = clazz.declaredConstructors.firstOrNull { ctor ->
             val p = ctor.parameterTypes
-            p.size >= 5
+            p.size >= 10
                 && p[0] == Int::class.javaPrimitiveType
                 && p[1] == Int::class.javaPrimitiveType
                 && p[2] == Int::class.javaPrimitiveType
-                && p[3] == Int::class.javaPrimitiveType
                 && p[4] == Boolean::class.javaPrimitiveType
+                && p[5] == Boolean::class.javaPrimitiveType
+                && p[7] == Boolean::class.javaPrimitiveType
+                && p[8] == Boolean::class.javaPrimitiveType
+                && p[9] == Boolean::class.javaPrimitiveType
+                && !p[6].isPrimitive
+                && (p[3] == Int::class.javaPrimitiveType || p[3].isEnum)
         } ?: throw NoSuchMethodException("AaUiHook: not found compatible LayoutInfo constructor for $className")
 
         fallback.isAccessible = true
-        log(tagName, "AaUiHook: fallback constructor selected, paramCount=${fallback.parameterCount}")
+        log(tagName, "AaUiHook: fallback constructor selected, paramCount=${fallback.parameterCount}, layoutTypeArg=${fallback.parameterTypes[3].name}")
         return fallback
+    }
+
+    private fun layoutTypeCode(raw: Any): Int? {
+        return when (raw) {
+            is Int -> raw - 1
+            is Enum<*> -> raw.toString().toIntOrNull()
+            else -> raw.toString().toIntOrNull()
+        }
+    }
+
+    private fun setLayoutTypeArg(args: Array<Any?>, targetCode: Int) {
+        val raw = args.getOrNull(3) ?: return
+        when (raw) {
+            is Int -> args[3] = targetCode + 1
+            is Enum<*> -> {
+                val enumClass = raw.javaClass
+                val enumValue = enumClass.enumConstants?.firstOrNull { c ->
+                    c?.toString()?.toIntOrNull() == targetCode
+                }
+                if (enumValue != null) {
+                    args[3] = enumValue
+                }
+            }
+        }
     }
 
     private fun hookFacetBar(config: SharedPreferences) {

@@ -10,3 +10,6 @@ aa-display/build
 .externalNativeBuild
 .cxx
 local.properties
+key.jks
+*.keystore
+*.jks

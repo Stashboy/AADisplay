@@ -49,6 +49,75 @@ class CoreManagerService private constructor(): ICoreManager.Stub() {
 
         private var mDisplayWindow: DisplayWindow? = null
         private var mAaVirtualDisplayAdapter: AaVirtualDisplayAdapter? = null
+        private data class DisplayProfile(
+            val width: Int,
+            val height: Int,
+            val densityDpi: Int
+        ) {
+            val isLandscape: Boolean
+                get() = width >= height
+        }
+        private var mLockedDisplayProfile: DisplayProfile? = null
+
+        private fun sanitizeDisplayProfile(width: Int, height: Int, densityDpi: Int): DisplayProfile {
+            return DisplayProfile(
+                width = width.coerceAtLeast(1),
+                height = height.coerceAtLeast(1),
+                densityDpi = densityDpi.coerceAtLeast(1)
+            )
+        }
+
+        /**
+         * Lock profile per active AA display session.
+         * - New display session: (re)learn from current size.
+         * - Reconnect within same session: keep locked size unless orientation flips.
+         */
+        private fun resolveDisplayProfile(
+            width: Int,
+            height: Int,
+            densityDpi: Int,
+            newSession: Boolean
+        ): DisplayProfile {
+            val candidate = sanitizeDisplayProfile(width, height, densityDpi)
+            val current = mLockedDisplayProfile
+            if (current == null) {
+                mLockedDisplayProfile = candidate
+                log(TAG, "displayProfile locked: ${candidate.width}*${candidate.height},${candidate.densityDpi}")
+                return candidate
+            }
+            if (newSession) {
+                if (current != candidate) {
+                    mLockedDisplayProfile = candidate
+                    log(
+                        TAG,
+                        "displayProfile relocked(new-session): ${current.width}*${current.height},${current.densityDpi} -> ${candidate.width}*${candidate.height},${candidate.densityDpi}"
+                    )
+                }
+                return mLockedDisplayProfile!!
+            }
+            if (current.isLandscape != candidate.isLandscape) {
+                mLockedDisplayProfile = candidate
+                log(
+                    TAG,
+                    "displayProfile relocked(orientation): ${current.width}*${current.height},${current.densityDpi} -> ${candidate.width}*${candidate.height},${candidate.densityDpi}"
+                )
+                return candidate
+            }
+            if (current != candidate) {
+                log(
+                    TAG,
+                    "displayProfile keep-locked(reconnect): locked=${current.width}*${current.height},${current.densityDpi}, incoming=${candidate.width}*${candidate.height},${candidate.densityDpi}"
+                )
+            }
+            return current
+        }
+
+        private fun clearDisplayProfileLock() {
+            mLockedDisplayProfile?.also {
+                log(TAG, "displayProfile cleared: ${it.width}*${it.height},${it.densityDpi}")
+            }
+            mLockedDisplayProfile = null
+        }
 
         @SuppressLint("UnspecifiedRegisterReceiverFlag")
         fun systemReady() {
@@ -133,9 +202,15 @@ class CoreManagerService private constructor(): ICoreManager.Stub() {
 
     override fun onCreateDisplay(width: Int, height: Int, densityDpi: Int, listener: IVirtualDisplayCreatedListener){
         runMain {
+            val profile = resolveDisplayProfile(
+                width = width,
+                height = height,
+                densityDpi = densityDpi,
+                newSession = mAaVirtualDisplayAdapter == null
+            )
             mAaVirtualDisplayAdapter?.apply {
-                onReconnected(width, height, densityDpi)
-                mDisplayWindow?.onResume(width, height)
+                onReconnected(profile.width, profile.height, profile.densityDpi)
+                mDisplayWindow?.onResume(profile.width, profile.height)
                 listener.onAvailableDisplay(this.mDisplayId, false)
                 return@runMain
             }
@@ -145,11 +220,17 @@ class CoreManagerService private constructor(): ICoreManager.Stub() {
             }
             AaVirtualDisplayAdapter(systemContext, config){
                 mAaVirtualDisplayAdapter = this
-                onConnected(width, height, densityDpi){ displayId ->
+                onConnected(profile.width, profile.height, profile.densityDpi){ displayId ->
                     listener.onAvailableDisplay(displayId, true)
                 }
                 mDisplayWindow?.onDestroyPromptly()
-                mDisplayWindow = DisplayWindow(CommonContextWrapper.createAppCompatContext(systemContext), this, width, height, densityDpi)
+                mDisplayWindow = DisplayWindow(
+                    CommonContextWrapper.createAppCompatContext(systemContext),
+                    this,
+                    profile.width,
+                    profile.height,
+                    profile.densityDpi
+                )
             }
         }
     }
@@ -166,6 +247,7 @@ class CoreManagerService private constructor(): ICoreManager.Stub() {
                 mAaVirtualDisplayAdapter?.onDestroy()
                 mDisplayWindow = null
                 mAaVirtualDisplayAdapter = null
+                clearDisplayProfileLock()
             }
         }
     }

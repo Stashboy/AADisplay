@@ -33,6 +33,8 @@ public interface ITaskStackListener extends IInterface {
     void onBackPressedOnTaskRoot(ActivityManager.RunningTaskInfo taskInfo) throws RemoteException;
     void onTaskDisplayChanged(int taskId, int newDisplayId) throws RemoteException;
     void onRecentTaskListUpdated() throws RemoteException;
+    //A16 Add
+    void onRecentTaskRemovedForAddTask(int taskId) throws RemoteException;
     void onRecentTaskListFrozenChanged(boolean frozen) throws RemoteException;
     void onTaskFocusChanged(int taskId, boolean focused) throws RemoteException;
     void onTaskRequestedOrientationChanged(int taskId, int requestedOrientation) throws RemoteException;
