@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.23.3 (2026-05-05)
+
+### Added
+- Smart-sidebar style controller flow:
+  - floating controller now starts minimized by default
+  - tap edge handle to open, tap close to hide, drag and snap left/right edge
+
+### Changed
+- Keyboard routing on virtual display now enforces local IME policy (`DisplayImePolicy=0`) for on-screen input on AADisplay side instead of fallback-to-phone behavior.
+
+### Fixed
+- Removed the non-functional disconnect-type (`A`) button from the floating controller.
+- Disconnect countdown now replaces the monitor button slot directly during disconnect flow for a cleaner 2-control vertical stack.
+
+### Verification
+- `:aa-display:assembleDebug` passed after controller + IME policy updates.
+- Installed successfully to test device for live verification.
+
 ## 0.23.2 (2026-05-05)
 
 ### Changed

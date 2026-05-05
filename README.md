@@ -9,8 +9,8 @@ Production-ready fork of [Nitsuya/AADisplay](https://github.com/Nitsuya/AADispla
 
 ## Version
 
-- Current module version: `0.23#16.6-r3`
-- See [CHANGELOG.md](CHANGELOG.md) and [RELEASE_NOTES_v0.23.2.md](RELEASE_NOTES_v0.23.2.md)
+- Current module version: `0.23#16.6-r4`
+- See [CHANGELOG.md](CHANGELOG.md) and [RELEASE_NOTES_v0.23.3.md](RELEASE_NOTES_v0.23.3.md)
 
 ## Requirements
 

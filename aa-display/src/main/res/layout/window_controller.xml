@@ -7,6 +7,29 @@
     android:layout_height="wrap_content">
 
     <com.google.android.material.card.MaterialCardView
+        android:id="@+id/cv_handle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="#4D000000"
+        android:visibility="gone"
+        app:cardBackgroundColor="?colorPrimaryContainer"
+        app:strokeColor="?colorOutline"
+        app:strokeWidth="2dp"
+        app:cardCornerRadius="18dp"
+        style="@style/Widget.Material3.CardView.Elevated">
+
+        <ImageButton
+            android:id="@+id/ib_handle"
+            android:layout_width="@dimen/notification_large_icon_width"
+            android:layout_height="@dimen/notification_large_icon_height"
+            android:background="?android:attr/selectableItemBackground"
+            android:padding="4dp"
+            android:src="@drawable/ic_monitor_24"
+            android:contentDescription="@string/controller_open_menu" />
+    </com.google.android.material.card.MaterialCardView>
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/cv_panel"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:background="#4D000000"
@@ -34,21 +57,21 @@
             android:visibility="visible">
 
             <ImageButton
-                android:id="@+id/ib_extinguish"
+                android:id="@+id/ib_hide_controller"
                 android:layout_width="@dimen/notification_large_icon_width"
                 android:layout_height="@dimen/notification_large_icon_height"
                 android:background="?android:attr/selectableItemBackground"
-                android:src="@drawable/ic_power_settings_new_24"
-                android:visibility="gone"
-                tools:visibility="visible"/>
+                android:padding="4dp"
+                android:src="@drawable/ic_close_24"
+                android:contentDescription="@string/controller_hide_menu" />
 
             <ImageButton
-                android:id="@+id/ib_disconnect_type"
+                android:id="@+id/ib_extinguish"
                 android:layout_width="@dimen/notification_large_icon_width"
                 android:layout_height="@dimen/notification_large_icon_height"
                 android:layout_marginTop="4dp"
                 android:background="?android:attr/selectableItemBackground"
-                android:src="@drawable/ic_motion_photos_auto_24"
+                android:src="@drawable/ic_power_settings_new_24"
                 android:visibility="gone"
                 tools:visibility="visible"/>
 
@@ -63,16 +86,6 @@
                 android:textSize="@dimen/notification_action_text_size"
                 android:background="?android:attr/selectableItemBackground"
                 android:textColor="?colorOnPrimaryContainer"
-                android:visibility="gone"
-                tools:visibility="visible"/>
-
-            <ImageButton
-                android:id="@+id/ib_exit_display"
-                android:layout_width="@dimen/notification_large_icon_width"
-                android:layout_height="@dimen/notification_large_icon_height"
-                android:layout_marginTop="4dp"
-                android:background="?android:attr/selectableItemBackground"
-                android:src="@drawable/ic_exit_to_app_24"
                 android:visibility="gone"
                 tools:visibility="visible"/>
 

@@ -42,6 +42,7 @@ class AaVirtualDisplayAdapter(
     companion object {
         const val TAG = "AADisplay_AaVirtualDisplayAdapter"
         private const val WINDOWING_MODE_PINNED = 2
+        private const val DISPLAY_IME_POLICY_LOCAL = 0
 
         /** Package names to ignore in recent task list */
         private val IGNORE_RECENT_PACKAGE = setOf(
@@ -136,7 +137,11 @@ class AaVirtualDisplayAdapter(
 
         try {
             Instances.iWindowManager.apply {
-                setDisplayImePolicy(mDisplayId, AADisplayConfig.DisplayImePolicy.get(config))
+                val configuredImePolicy = AADisplayConfig.DisplayImePolicy.get(config)
+                if (configuredImePolicy != DISPLAY_IME_POLICY_LOCAL) {
+                    log(TAG, "override display IME policy: $configuredImePolicy -> $DISPLAY_IME_POLICY_LOCAL")
+                }
+                setDisplayImePolicy(mDisplayId, DISPLAY_IME_POLICY_LOCAL)
                 setShouldShowWithInsecureKeyguard(mDisplayId, false)
                 setShouldShowSystemDecors(mDisplayId, false)
             }

@@ -45,8 +45,6 @@ class DisplayWindow(
 ): View.OnTouchListener {
     companion object {
         private const val TAG = "AADisplay_DisplayWindow"
-        const val AA_DISCONNECT_DELAY_EXIT_TYPE = 1
-        const val AA_DISCONNECT_SUSPEND_TYPE = 2
     }
 
     private var mControllerBinding: WindowControllerBinding? = null
@@ -57,8 +55,9 @@ class DisplayWindow(
 
     private var mControllerStatus = false
     private var mMirrorStatus = false
-
-    private var mAaDisconnectType = AA_DISCONNECT_DELAY_EXIT_TYPE
+    private var mControllerCollapsed = true
+    private var mControllerDockRight = true
+    private val mControllerPeekPx by lazy { (mContext.resources.displayMetrics.density * 14f).toInt() }
 
     private var mDisplayRatio = 1f
     private var mDisplayPower = true
@@ -162,28 +161,17 @@ class DisplayWindow(
             root.allViews.forEach {
                 it.setOnTouchListener(this@DisplayWindow)
             }
+            ibHandle.setOnClickListener {
+                expandController()
+            }
+            ibHideController.setOnClickListener {
+                collapseController()
+            }
             if(mScreenOffReplaceLockScreen){
                 ibExtinguish.visibility = View.VISIBLE
                 ibExtinguish.setOnClickListener {
                     toggleDisplayPower(false)
                 }
-            }
-            if(mDelayDestroyTime > 0){
-                ibDisconnectType.visibility = View.VISIBLE
-                ibDisconnectType.setOnClickListener {
-                    mAaDisconnectType = if(mAaDisconnectType == AA_DISCONNECT_DELAY_EXIT_TYPE) {
-                        ibDisconnectType.setImageResource(R.drawable.ic_motion_photos_pause_24)
-                        AA_DISCONNECT_SUSPEND_TYPE
-                    } else {
-                        ibDisconnectType.setImageResource(R.drawable.ic_motion_photos_auto_24)
-                        AA_DISCONNECT_DELAY_EXIT_TYPE
-                    }
-                }
-            }
-            tvDestroyTime.setOnClickListener {
-                mDestroyJob?.cancel()
-                tvDestroyTime.visibility = View.GONE
-                ibExitDisplay.visibility = View.VISIBLE
             }
             ibMirrorDisplay.setOnClickListener {
                 hideController()
@@ -357,11 +345,9 @@ class DisplayWindow(
         interactiveMonitor.init()
         mDestroyJob?.cancelAndJoin()
         updateDipslaySize()
-        mAaDisconnectType = AA_DISCONNECT_DELAY_EXIT_TYPE
         mControllerBinding?.apply {
             tvDestroyTime.visibility = View.GONE
-            ibExitDisplay.visibility = View.GONE
-            ibDisconnectType.visibility = View.VISIBLE
+            ibMirrorDisplay.visibility = View.VISIBLE
         }
         showController()
     }
@@ -383,34 +369,29 @@ class DisplayWindow(
             return
         }
         mControllerBinding?.apply {
-            ibDisconnectType.visibility = View.GONE
-            ibExitDisplay.setOnClickListener {
+            ibMirrorDisplay.visibility = View.GONE
+            tvDestroyTime.setOnClickListener {
+                mDestroyJob?.cancel()
                 close()
                 onDestroySucceed()
             }
-            if(mAaDisconnectType == AA_DISCONNECT_SUSPEND_TYPE){
-                tvDestroyTime.visibility = View.GONE
-                ibExitDisplay.visibility = View.VISIBLE
-            } else {
-                mDestroyJob = flow {
-                    for (i in mDelayDestroyTime downTo 0) {
-                        emit(i)
-                        delay(1000)
-                    }
-                }.onStart {
-                    ibExitDisplay.visibility = View.GONE
-                    tvDestroyTime.visibility = View.VISIBLE
-                }.onEach {
-                    if(mControllerStatus){
-                        tvDestroyTime.text = "${it}S"
-                    }
-                }.onCompletion {
-                    if(it == null){
-                        close()
-                        onDestroySucceed()
-                    }
-                }.launchIn(CoroutineScope(Dispatchers.Main))
-            }
+            mDestroyJob = flow {
+                for (i in mDelayDestroyTime downTo 0) {
+                    emit(i)
+                    delay(1000)
+                }
+            }.onStart {
+                tvDestroyTime.visibility = View.VISIBLE
+            }.onEach {
+                if(mControllerStatus){
+                    tvDestroyTime.text = "${it}S"
+                }
+            }.onCompletion {
+                if(it == null){
+                    close()
+                    onDestroySucceed()
+                }
+            }.launchIn(CoroutineScope(Dispatchers.Main))
         }
     }
 
@@ -441,6 +422,10 @@ class DisplayWindow(
         if(mControllerStatus) return
         mControllerBinding?.apply {
             tryOrNull { Instances.windowManager.addView(root, mControllerLayoutParams) }
+            applyControllerCollapsedState()
+            root.post {
+                applyControllerDockPosition()
+            }
             mChangeAlphaCountDownTimer.start()
             mControllerStatus = true
         }
@@ -497,15 +482,69 @@ class DisplayWindow(
     }
 
     private fun expandController(){
+        setControllerCollapsed(false)
+    }
+    private fun collapseController(){
+        setControllerCollapsed(true)
+    }
+
+    private fun setControllerCollapsed(collapsed: Boolean) {
+        mControllerCollapsed = collapsed
+        applyControllerCollapsedState()
+        mControllerBinding?.root?.post {
+            applyControllerDockPosition()
+        }
+    }
+
+    private fun applyControllerCollapsedState() {
         mControllerBinding?.apply {
-            llPanel.visibility = View.VISIBLE
+            cvPanel.visibility = if (mControllerCollapsed) View.GONE else View.VISIBLE
+            cvHandle.visibility = if (mControllerCollapsed) View.VISIBLE else View.GONE
+            llPanel.visibility = if (mControllerCollapsed) View.GONE else View.VISIBLE
             ibExpand.visibility = View.GONE
         }
     }
-    private fun collapseController(){
-        mControllerBinding?.apply {
-            llPanel.visibility = View.GONE
-            ibExpand.visibility = View.VISIBLE
+
+    private fun applyControllerDockPosition() {
+        val binding = mControllerBinding ?: return
+        val displayMetrics = mContext.resources.displayMetrics
+        val visibleWidth = getControllerVisibleWidth(binding)
+        val visibleHeight = getControllerVisibleHeight(binding)
+        if (visibleWidth <= 0 || visibleHeight <= 0) return
+
+        mControllerLayoutParams.x = if (mControllerCollapsed) {
+            if (mControllerDockRight) {
+                displayMetrics.widthPixels - mControllerPeekPx
+            } else {
+                -(visibleWidth - mControllerPeekPx)
+            }
+        } else {
+            if (mControllerDockRight) {
+                displayMetrics.widthPixels - visibleWidth
+            } else {
+                0
+            }
+        }
+        mControllerLayoutParams.y = mControllerLayoutParams.y.coerceIn(
+            0,
+            (displayMetrics.heightPixels - visibleHeight).coerceAtLeast(0)
+        )
+        tryOrNull { Instances.windowManager.updateViewLayout(binding.root, mControllerLayoutParams) }
+    }
+
+    private fun getControllerVisibleWidth(binding: WindowControllerBinding): Int {
+        return if (mControllerCollapsed) {
+            binding.cvHandle.width.takeIf { it > 0 } ?: binding.cvHandle.measuredWidth
+        } else {
+            binding.cvPanel.width.takeIf { it > 0 } ?: binding.cvPanel.measuredWidth
+        }
+    }
+
+    private fun getControllerVisibleHeight(binding: WindowControllerBinding): Int {
+        return if (mControllerCollapsed) {
+            binding.cvHandle.height.takeIf { it > 0 } ?: binding.cvHandle.measuredHeight
+        } else {
+            binding.cvPanel.height.takeIf { it > 0 } ?: binding.cvPanel.measuredHeight
         }
     }
 
@@ -569,18 +608,9 @@ class DisplayWindow(
                 }
                 MotionEvent.ACTION_UP -> {
                     isDrag = v.getTag(R.id.is_drag) as Boolean
-                    Instances.windowManager.updateViewLayout(root, mControllerLayoutParams.apply {
-                        val displayMetrics = mContext.resources.displayMetrics
-                        x = if(event.rawX > (displayMetrics.widthPixels / 2)) displayMetrics.widthPixels - root.measuredWidth else 0
-                        if (y < 0) {
-                            y = 0
-                        } else {
-                            var height = displayMetrics.heightPixels - root.measuredHeight
-                            if(y > height) {
-                                y = height
-                            }
-                        }
-                    })
+                    val displayMetrics = mContext.resources.displayMetrics
+                    mControllerDockRight = event.rawX > (displayMetrics.widthPixels / 2f)
+                    applyControllerDockPosition()
                     mChangeAlphaCountDownTimer.start()
                 }
             }
