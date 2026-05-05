@@ -11,12 +11,23 @@
     <string name="need_LSPosed">Need LSPosed</string>
     <string name="not_activated">Not Activated</string>
     <string name="reboot">Reboot</string>
+    <string name="menu_github">GitHub</string>
     <string name="auto_open_title">Auto Open</string>
     <string name="auto_open_summary">Automatically open app when Android Auto is connected</string>
     <string name="default_launch_package_title">Default Launch Package</string>
-    <string name="default_launch_package_summary">Package name launched when AADisplay starts</string>
-    <string name="default_launch_package_empty">Default Launch Package cannot be empty</string>
+    <string name="default_launch_package_summary">App package launched when AADisplay starts</string>
+    <string name="default_launch_package_empty">Default Launch Package is required</string>
+    <string name="default_home_detected">Default Home Launcher: %1$s</string>
+    <string name="default_home_unknown">Default Home Launcher: Not detected</string>
+    <string name="launcher_list_missing">No launcher packages detected on this device</string>
+    <string name="single_launcher_warning">Only one launcher is installed. Using the same launcher as your default home launcher can cause a fatal crash. Install a second launcher first.</string>
+    <string name="package_same_error">You cannot set the Default Launch Package to the same as your device\'s Default (Launcher) Home app</string>
+    <string name="package_validation_ok">Launch package is safe to use</string>
+    <string name="save_settings">Save</string>
     <string name="delay_destroy_time_title">Delay Destroy Time</string>
-    <string name="delay_destroy_time_invalid">Delay Destroy Time must be a non-negative number</string>
-    <string name="saved">Saved</string>
+    <string name="delay_destroy_time_invalid">Select a valid Delay Destroy Time</string>
+    <string name="delay_60_seconds">60 Seconds</string>
+    <string name="delay_120_seconds">120 Seconds</string>
+    <string name="delay_180_seconds">180 Seconds</string>
+    <string name="settings_saved_successfully">Settings saved successfully</string>
 </resources>

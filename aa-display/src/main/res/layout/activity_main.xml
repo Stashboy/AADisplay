@@ -3,7 +3,9 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
     <LinearLayout
         android:id="@+id/ll"
         android:layout_width="match_parent"
@@ -49,7 +51,7 @@
                     android:textAppearance="?textAppearanceTitleMedium"
                     android:textColor="?colorOnPrimary"
                     android:textSize="16sp"
-                    tools:text="Magisk: activated" />
+                    tools:text="Activated" />
 
                 <com.google.android.material.textview.MaterialTextView
                     android:id="@+id/tv_version"
@@ -61,7 +63,7 @@
                     android:layout_toEndOf="@id/iv_icon"
                     android:textAppearance="?textAppearanceBodyMedium"
                     android:textColor="?colorOnPrimary"
-                    tools:text="1.2.3" />
+                    tools:text="0.23#16.6-r1" />
 
             </RelativeLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -150,39 +152,69 @@
                         android:layout_centerVertical="true" />
                 </RelativeLayout>
 
-                <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/til_launcher_package"
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/tv_default_home"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="14dp"
+                    android:textAppearance="?textAppearanceBodyMedium"
+                    android:textColor="?android:attr/textColorSecondary"
+                    tools:text="Default Home Launcher: com.example.launcher" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/til_launcher_package"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
                     android:hint="@string/default_launch_package_title"
                     app:helperText="@string/default_launch_package_summary">
 
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/et_launcher_package"
+                    <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                        android:id="@+id/actv_launcher_package"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="text"
+                        android:imeOptions="actionNext"
+                        android:inputType="none"
+                        android:maxLines="1"
                         android:singleLine="true" />
                 </com.google.android.material.textfield.TextInputLayout>
 
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/tv_package_validation"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textAppearance="?textAppearanceBodySmall"
+                    android:visibility="gone"
+                    tools:text="Launch package is safe to use"
+                    tools:visibility="visible" />
+
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/til_delay_destroy_time"
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
                     android:hint="@string/delay_destroy_time_title">
 
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/et_delay_destroy_time"
+                    <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                        android:id="@+id/actv_delay_destroy_time"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:imeOptions="actionDone"
-                        android:inputType="number"
+                        android:imeOptions="actionNext"
+                        android:inputType="none"
+                        android:maxLines="1"
                         android:singleLine="true" />
                 </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_save"
+                    style="@style/Widget.Material3.Button"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/save_settings" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

@@ -4,7 +4,6 @@ import android.content.SharedPreferences
 import com.github.kyuubiran.ezxhelper.utils.tryOrNull
 import java.io.StringReader
 import java.util.*
-import kotlin.streams.toList
 
 sealed class AADisplayConfig<T>(val key: String) {
     companion object {
@@ -46,7 +45,10 @@ sealed class AADisplayConfig<T>(val key: String) {
     abstract class ArrayStringConfig(key: String): AADisplayConfig<Array<String>>(key){
         override fun get(config: SharedPreferences?): Array<String>{
             return config?.getString(key, null)?.let {
-                it.split("\n").stream().map(String::trim).filter(String::isNotBlank).toList().toTypedArray()
+                it.split("\n")
+                    .map(String::trim)
+                    .filter(String::isNotBlank)
+                    .toTypedArray()
             } ?: emptyArray()
         }
     }

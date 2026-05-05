@@ -193,6 +193,7 @@ class AaControlService: MediaBrowserServiceCompat() {
         session.release()
         car?.disconnect()
         car = null
+        super.onDestroy()
     }
 
     override fun onGetRoot(clientPackageName: String, clientUid: Int, rootHints: Bundle?): BrowserRoot? {

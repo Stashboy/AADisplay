@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
@@ -51,8 +52,8 @@ class AaVirtualDisplayAdapter(
 
     /** Default launch package name: the app package to launch when virtual display is created, can be null */
     private var mLauncherPackage = AADisplayConfig.LauncherPackage.get(CoreManagerService.config)
-    
-    /** Home package follows launcher package; separate HomePackage config is deprecated. */
+
+    /** Home package for AADisplay task-view behavior, internally synced to launch package. */
     private var mHomePackage = mLauncherPackage
     
     /** Task ID of the Home package */
@@ -191,6 +192,12 @@ class AaVirtualDisplayAdapter(
         mIsDestroying = true
         trackPackage(mLauncherPackage, 0)
         trackPackage(mHomePackage, 0)
+        val protectedPackages = linkedSetOf<String>().apply {
+            add(BuildConfig.APPLICATION_ID)
+            mLauncherPackage?.trim()?.takeIf { it.isNotEmpty() }?.let { add(it) }
+            mHomePackage?.trim()?.takeIf { it.isNotEmpty() }?.let { add(it) }
+            addAll(getForegroundPackagesOnDisplay(Display.DEFAULT_DISPLAY))
+        }
         tryOrNull { Instances.iActivityTaskManager.unregisterTaskStackListener(mTaskStackListener) }
         tryOrNull {
             val taskInfos = Instances.iActivityTaskManager.getAllRootTaskInfosOnDisplay(mDisplayId)
@@ -199,7 +206,7 @@ class AaVirtualDisplayAdapter(
                 removeTask(task.taskId)
             }
             mTrackedPackageUsers
-                .filterKeys { pkg -> pkg.isNotBlank() && pkg != BuildConfig.APPLICATION_ID }
+                .filterKeys { pkg -> pkg.isNotBlank() && !protectedPackages.contains(pkg) }
                 .forEach { (pkg, userIds) ->
                     userIds.ifEmpty { mutableSetOf(0) }.forEach { userId ->
                         try {
@@ -238,16 +245,41 @@ class AaVirtualDisplayAdapter(
         mDensityDpi = 0
     }
 
+    private fun getForegroundPackagesOnDisplay(displayId: Int): Set<String> {
+        val tasks = try {
+            Instances.iActivityTaskManager.getAllRootTaskInfosOnDisplay(displayId)
+        } catch (_: Throwable) {
+            emptyList()
+        }
+        if (tasks.isEmpty()) return emptySet()
+        val topMost = tasks.firstOrNull { it.topActivity != null }
+        val packages = linkedSetOf<String>()
+        topMost?.topActivity?.packageName?.let { pkg ->
+            if (pkg.isNotBlank()) packages.add(pkg)
+        }
+        runCatching {
+            topMost?.getObjectAs("baseActivity", ComponentName::class.java) as? ComponentName
+        }.getOrNull()?.packageName?.let { pkg ->
+            if (pkg.isNotBlank()) packages.add(pkg)
+        }
+        return packages
+    }
+
     fun onTouch(event: MotionEvent) = injectInputEvent(event)
 
     fun onPressKey(action: Int) {
-        val uptimeMillis = SystemClock.uptimeMillis()
-        injectInputEvent(KeyEvent(uptimeMillis, uptimeMillis, KeyEvent.ACTION_DOWN, action, 0).apply {
-            source = InputDevice.SOURCE_KEYBOARD
-        })
-        injectInputEvent(KeyEvent(uptimeMillis, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, action, 0).apply {
-            source = InputDevice.SOURCE_KEYBOARD
-        })
+        injectInputEvent(createKeyEvent(KeyEvent.ACTION_DOWN, action))
+        injectInputEvent(createKeyEvent(KeyEvent.ACTION_UP, action))
+        if (action == KeyEvent.KEYCODE_BACK) {
+            // Match Home-button behavior: if back navigation returns to home and a PiP task is left
+            // pinned, remove it so the launcher view is clean.
+            Handler(Looper.getMainLooper()).post {
+                clearPinnedTasksIfHomeFront("back")
+            }
+            Handler(Looper.getMainLooper()).postDelayed({
+                clearPinnedTasksIfHomeFront("back-delay")
+            }, 350L)
+        }
     }
 
     fun addMirror(surfaceControl: SurfaceControl){
@@ -474,6 +506,23 @@ class AaVirtualDisplayAdapter(
             }
     }
 
+    private fun clearPinnedTasksIfHomeFront(reason: String) {
+        if (mDisplayId == Display.INVALID_DISPLAY) return
+        val tasks = try {
+            Instances.iActivityTaskManager.getAllRootTaskInfosOnDisplay(mDisplayId)
+        } catch (e: Throwable) {
+            log(TAG, "clearPinnedTasksIfHomeFront error:", e)
+            return
+        }
+        if (tasks.isEmpty()) return
+        val front = tasks.firstOrNull { it.topActivity != null }
+        val frontPackage = front?.topActivity?.packageName
+        if (frontPackage == null || mHomePackage == null) return
+        if (frontPackage == mHomePackage) {
+            clearPinnedTasksOnDisplay(reason)
+        }
+    }
+
     private fun isPinnedWindowMode(taskInfo: Any): Boolean {
         return try {
             val mode = taskInfo.invokeMethod("getWindowingMode", args(), argTypes()) as? Int
@@ -483,9 +532,39 @@ class AaVirtualDisplayAdapter(
         }
     }
 
-    private fun injectInputEvent(event: InputEvent){
-        event.invokeMethod("setDisplayId", args(mDisplayId), argTypes(Integer.TYPE))
-        Instances.iInputManager.injectInputEvent(event, 0)
+    private fun injectInputEvent(event: InputEvent): Boolean {
+        if (mDisplayId == Display.INVALID_DISPLAY) return false
+        return try {
+            event.invokeMethod("setDisplayId", args(mDisplayId), argTypes(Integer.TYPE))
+            val result = Instances.iInputManager.injectInputEvent(event, 0)
+            if (!result) {
+                log(TAG, "injectInputEvent failed: ${event.javaClass.simpleName}")
+            }
+            result
+        } catch (e: Throwable) {
+            log(TAG, "injectInputEvent exception:", e)
+            false
+        }
+    }
+
+    /**
+     * Matches Android's VirtualDisplayTaskEmbedder key event shape for back navigation.
+     * See AOSP: VirtualDisplayTaskEmbedder#createKeyEvent()
+     */
+    private fun createKeyEvent(action: Int, keyCode: Int): KeyEvent {
+        val whenMillis = SystemClock.uptimeMillis()
+        return KeyEvent(
+            whenMillis,
+            whenMillis,
+            action,
+            keyCode,
+            0,
+            0,
+            KeyCharacterMap.VIRTUAL_KEYBOARD,
+            0,
+            KeyEvent.FLAG_FROM_SYSTEM or KeyEvent.FLAG_VIRTUAL_HARD_KEY,
+            InputDevice.SOURCE_KEYBOARD
+        )
     }
 
     private fun trackPackage(packageName: String?, userId: Int = 0) {
