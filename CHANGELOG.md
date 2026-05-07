@@ -1,30 +1,5 @@
 # Changelog
 
-## 0.23.4 (2026-05-06)
-
-### Changed
-- Enforced head-unit-only AADisplay session behavior:
-  - removed phone-side monitor/taskview entry behavior from active session flow
-  - Android Auto launcher/home rail action now emits explicit session-exit signal before returning to AA launcher UI
-- Settings surface simplified further:
-  - removed `Delay Destroy Time` control from the app UI
-  - destroy policy now defaults to immediate backend teardown (`DelayDestroyTime=0`)
-
-### Improved
-- Latency-focused hot-path optimization (quality-preserving):
-  - removed per-call dynamic proxy + verbose binder logging in `CoreManager`, reducing IPC overhead during frequent control/input operations
-  - added single-pointer fast path for MotionEvent allocation in AA touch forwarding path to reduce per-frame object churn
-
-### Fixed
-- Restored touch reliability after validating an unsafe dispatch-thread optimization regression:
-  - kept proven input dispatch path (`runBlocking(Dispatchers.IO)` for touch + `runIO` for key) while retaining other safe optimizations
-- On AA disconnect, backend destroy is now explicitly triggered via `CarConnectionCallback.onDisconnected`.
-
-### Verification
-- `:aa-display:assembleDebug` passed.
-- `:aa-display:assembleRelease` passed.
-- `:aa-display:lintDebug` passed with no new release-blocking errors.
-
 ## 0.23.3 (2026-05-05)
 
 ### Added

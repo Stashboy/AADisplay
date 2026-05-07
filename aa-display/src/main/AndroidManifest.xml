@@ -17,8 +17,7 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.AADisplay"
-        tools:targetApi="31"
-        tools:ignore="MissingMediaBrowserServiceIntentFilter,MissingIntentFilterForMediaSearch" >
+        tools:targetApi="31" >
         <meta-data
             android:name="xposedmodule"
             android:value="true" />

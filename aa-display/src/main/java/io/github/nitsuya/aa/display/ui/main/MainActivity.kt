@@ -53,14 +53,22 @@ class MainActivity :
             }
     }
 
+    private data class DelayOption(
+        val seconds: Int,
+        val label: String
+    )
+
     private val appConfig by lazy {
         getSharedPreferences(AADisplayConfig.ConfigName, MODE_WORLD_READABLE)
     }
 
     private var launcherOptions: List<LauncherOption> = emptyList()
     private var launcherDisplayToPackage: Map<String, String> = emptyMap()
+    private var delayOptions: List<DelayOption> = emptyList()
+    private var delayDisplayToSeconds: Map<String, Int> = emptyMap()
     private var defaultHomePackage: String? = null
     private var savedLauncherPackage: String? = null
+    private var savedDelayDestroyTime: Int = 180
     private var savedAutoOpen: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -179,6 +187,31 @@ class MainActivity :
             }
         }
 
+        baseBinding.actvDelayDestroyTime.apply {
+            inputType = InputType.TYPE_NULL
+            keyListener = null
+            threshold = 0
+            isCursorVisible = false
+            isLongClickable = false
+            showSoftInputOnFocus = false
+            setTextIsSelectable(false)
+            setOnClickListener {
+                showAllDelayOptions()
+            }
+            setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) {
+                    showAllDelayOptions()
+                }
+                if (!hasFocus) {
+                    validateDelaySelection(showError = true)
+                }
+            }
+            setOnItemClickListener { _, _, _, _ ->
+                validateDelaySelection(showError = false)
+                updateSaveButtonState()
+            }
+        }
+
         baseBinding.btnSave.setOnClickListener {
             persistSettings()
         }
@@ -187,10 +220,12 @@ class MainActivity :
     private fun refreshSettingControls() {
         savedAutoOpen = AADisplayConfig.AutoOpen.get(appConfig)
         savedLauncherPackage = AADisplayConfig.LauncherPackage.get(appConfig)?.trim().orEmpty()
+        savedDelayDestroyTime = AADisplayConfig.DelayDestroyTime.get(appConfig)
         baseBinding.switchAutoOpen.isChecked = savedAutoOpen
 
         detectLauncherEnvironment()
         bindLauncherDropdown()
+        bindDelayDropdown()
 
         val configuredLauncher = savedLauncherPackage.orEmpty()
         val selected = launcherOptions.firstOrNull { it.packageName == configuredLauncher }
@@ -202,7 +237,16 @@ class MainActivity :
             baseBinding.actvLauncherPackage.setText("", false)
         }
 
+        val selectedDelay = delayOptions.firstOrNull { it.seconds == savedDelayDestroyTime }
+            ?: delayOptions.firstOrNull()
+        if (selectedDelay != null) {
+            baseBinding.actvDelayDestroyTime.setText(selectedDelay.label, false)
+        } else {
+            baseBinding.actvDelayDestroyTime.setText("", false)
+        }
+
         validateLauncherSelection()
+        validateDelaySelection(showError = false)
         updateSaveButtonState()
     }
 
@@ -238,12 +282,34 @@ class MainActivity :
         baseBinding.actvLauncherPackage.setAdapter(adapter)
     }
 
+    private fun bindDelayDropdown() {
+        delayOptions = listOf(
+            DelayOption(60, getString(R.string.delay_60_seconds)),
+            DelayOption(120, getString(R.string.delay_120_seconds)),
+            DelayOption(180, getString(R.string.delay_180_seconds))
+        )
+        delayDisplayToSeconds = delayOptions.associate { it.label to it.seconds }
+        val adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_list_item_1,
+            delayOptions.map { it.label }
+        )
+        baseBinding.actvDelayDestroyTime.setAdapter(adapter)
+    }
+
     private fun showAllLauncherOptions() {
         @Suppress("UNCHECKED_CAST")
         val adapter = baseBinding.actvLauncherPackage.adapter as? ArrayAdapter<String> ?: return
         // Force-reset filtering so the popup always shows all launcher choices.
         adapter.filter.filter(null)
         baseBinding.actvLauncherPackage.showDropDown()
+    }
+
+    private fun showAllDelayOptions() {
+        @Suppress("UNCHECKED_CAST")
+        val adapter = baseBinding.actvDelayDestroyTime.adapter as? ArrayAdapter<String> ?: return
+        adapter.filter.filter(null)
+        baseBinding.actvDelayDestroyTime.showDropDown()
     }
 
     private fun queryLauncherOptions(pm: PackageManager): List<LauncherOption> {
@@ -348,6 +414,13 @@ class MainActivity :
         return launcherOptions.firstOrNull { it.packageName == raw }?.packageName
     }
 
+    private fun resolveSelectedDelaySeconds(): Int? {
+        val raw = baseBinding.actvDelayDestroyTime.text?.toString()?.trim().orEmpty()
+        if (raw.isBlank()) return null
+        delayDisplayToSeconds[raw]?.let { return it }
+        return delayOptions.firstOrNull { it.label == raw }?.seconds
+    }
+
     private fun validateLauncherSelection(): Boolean {
         val selectedPackage = resolveSelectedLauncherPackage()
 
@@ -386,31 +459,47 @@ class MainActivity :
         return true
     }
 
+    private fun validateDelaySelection(showError: Boolean): Boolean {
+        val value = resolveSelectedDelaySeconds()
+        val valid = value != null && delayOptions.any { it.seconds == value }
+        if (!valid && showError) {
+            baseBinding.tilDelayDestroyTime.error = getString(R.string.delay_destroy_time_invalid)
+        } else if (valid) {
+            baseBinding.tilDelayDestroyTime.error = null
+        }
+        return valid
+    }
+
     private fun persistSettings() {
         val launcherValid = validateLauncherSelection()
-        if (!launcherValid) {
+        val delayValid = validateDelaySelection(showError = true)
+        if (!launcherValid || !delayValid) {
             updateSaveButtonState()
             return
         }
 
         val launcherPackage = resolveSelectedLauncherPackage() ?: return
+        val delay = resolveSelectedDelaySeconds() ?: return
 
         appConfig.edit()
             .putBoolean(AADisplayConfig.AutoOpen.key, baseBinding.switchAutoOpen.isChecked)
             .putString(AADisplayConfig.LauncherPackage.key, launcherPackage)
             .putString(AADisplayConfig.HomePackage.key, launcherPackage)
-            .putString(AADisplayConfig.DelayDestroyTime.key, "0")
+            .putString(AADisplayConfig.DelayDestroyTime.key, delay.toString())
             .apply()
 
         savedAutoOpen = baseBinding.switchAutoOpen.isChecked
         savedLauncherPackage = launcherPackage
+        savedDelayDestroyTime = delay
         Toast.makeText(this, getString(R.string.settings_saved_successfully), Toast.LENGTH_SHORT).show()
         updateSaveButtonState()
     }
 
     private fun updateSaveButtonState() {
         val hasChanges = hasPendingChanges()
-        val enabled = hasChanges && validateLauncherSelection()
+        val enabled = hasChanges &&
+            validateLauncherSelection() &&
+            validateDelaySelection(showError = false)
         baseBinding.btnSave.isEnabled = enabled
         baseBinding.btnSave.alpha = if (enabled) 1f else 0.6f
     }
@@ -418,8 +507,10 @@ class MainActivity :
     private fun hasPendingChanges(): Boolean {
         val currentAutoOpen = baseBinding.switchAutoOpen.isChecked
         val currentLauncher = resolveSelectedLauncherPackage()
+        val currentDelay = resolveSelectedDelaySeconds()
         return currentAutoOpen != savedAutoOpen ||
-            currentLauncher != savedLauncherPackage
+            currentLauncher != savedLauncherPackage ||
+            currentDelay != savedDelayDestroyTime
     }
 
     private fun showValidationMessage(message: String, success: Boolean) {

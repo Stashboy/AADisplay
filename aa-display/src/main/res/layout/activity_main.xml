@@ -190,6 +190,24 @@
                     tools:text="Launch package is safe to use"
                     tools:visibility="visible" />
 
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/til_delay_destroy_time"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:hint="@string/delay_destroy_time_title">
+
+                    <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                        android:id="@+id/actv_delay_destroy_time"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:imeOptions="actionNext"
+                        android:inputType="none"
+                        android:maxLines="1"
+                        android:singleLine="true" />
+                </com.google.android.material.textfield.TextInputLayout>
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_save"
                     style="@style/Widget.Material3.Button"
