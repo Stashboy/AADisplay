@@ -17,7 +17,7 @@ sealed class AADisplayConfig<T>(val key: String) {
     object AutoOpen: BooleanConfig("AutoOpen", true)
     object VirtualDisplayDpi: IntConfig("VirtualDisplayDpi", 0)
     object AndroidAutoDpi: IntConfig("AndroidAutoDpi", 0)
-    object DelayDestroyTime: IntConfig("DelayDestroyTime", 180)
+    object DelayDestroyTime: IntConfig("DelayDestroyTime", 0)
     object ScreenOffReplaceLockScreen: BooleanConfig("ScreenOffReplaceLockScreen", false)
     object CloseLauncherDashboard: BooleanConfig("CloseLauncherDashboard", true)
     object ForceRightAngle: BooleanConfig("ForceRightAngle", true)

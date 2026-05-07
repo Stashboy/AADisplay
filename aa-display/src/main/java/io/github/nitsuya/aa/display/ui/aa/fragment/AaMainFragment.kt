@@ -43,6 +43,8 @@ class AaMainFragment : BaseFragment<FragmentAaMainBinding>(FragmentAaMainBinding
         }
         override fun onDisconnected(car: Car) {
             carManager = null
+            // Ensure backend teardown is immediate when AA disconnects.
+            CoreApi.onDestroyDisplay()
         }
     }
 
@@ -85,6 +87,11 @@ class AaMainFragment : BaseFragment<FragmentAaMainBinding>(FragmentAaMainBinding
                                 }
                             }
                         }
+                    }
+                }
+                AABroadcastConst.ACTION_SESSION_CONTROL -> {
+                    when (intent.getIntExtra(AABroadcastConst.EXTRA_SESSION_ACTION, 0)) {
+                        AABroadcastConst.SESSION_ACTION_EXIT -> CoreApi.onDestroyDisplay()
                     }
                 }
                 AABroadcastConst.ACTION_STEERING_WHEEL_CONTROL -> {
@@ -148,18 +155,44 @@ class AaMainFragment : BaseFragment<FragmentAaMainBinding>(FragmentAaMainBinding
                                 if (e.action === MotionEvent.ACTION_DOWN) {
                                     repairDownTime = uptimeMillis
                                 }
-                                val pointerCoords: Array<MotionEvent.PointerCoords?> = arrayOfNulls(e.pointerCount)
-                                val pointerProperties: Array<MotionEvent.PointerProperties?> = arrayOfNulls(e.pointerCount)
-                                for (i in 0 until e.pointerCount) {
-                                    pointerCoords[i] = MotionEvent.PointerCoords().apply {
-                                        e.getPointerCoords(i, this)
+                                val newEvent = if (e.pointerCount == 1) {
+                                    // Fast path for the vast majority of interactions.
+                                    MotionEvent.obtain(
+                                        repairDownTime,
+                                        uptimeMillis,
+                                        e.action,
+                                        e.x,
+                                        e.y,
+                                        e.metaState
+                                    )
+                                } else {
+                                    val pointerCoords: Array<MotionEvent.PointerCoords?> = arrayOfNulls(e.pointerCount)
+                                    val pointerProperties: Array<MotionEvent.PointerProperties?> = arrayOfNulls(e.pointerCount)
+                                    for (i in 0 until e.pointerCount) {
+                                        pointerCoords[i] = MotionEvent.PointerCoords().apply {
+                                            e.getPointerCoords(i, this)
+                                        }
+                                        pointerProperties[i] = MotionEvent.PointerProperties().apply {
+                                            e.getPointerProperties(i, this)
+                                        }
                                     }
-                                    pointerProperties[i] = MotionEvent.PointerProperties().apply {
-                                        e.getPointerProperties(i, this)
-                                    }
+                                    MotionEvent.obtain(
+                                        repairDownTime,
+                                        uptimeMillis,
+                                        e.action,
+                                        e.pointerCount,
+                                        pointerProperties,
+                                        pointerCoords,
+                                        0,
+                                        0,
+                                        1.0f,
+                                        1.0f,
+                                        0,
+                                        0,
+                                        0,
+                                        0
+                                    )
                                 }
-                                //val newEvent = MotionEvent.obtain(repairDownTime, uptimeMillis, e.action, e.pointerCount, pointerProperties, pointerCoords, e.metaState, e.buttonState, e.xPrecision, e.yPrecision, e.deviceId, e.edgeFlags, e.source, e.flags)
-                                val newEvent = MotionEvent.obtain(repairDownTime, uptimeMillis, e.action, e.pointerCount, pointerProperties, pointerCoords,0,0,1.0f,1.0f,0,0,0,0)
                                 newEvent.source = InputDeviceCompat.SOURCE_TOUCHSCREEN
                                 CoreApi.touch(newEvent)
                                 newEvent.recycle()
@@ -169,6 +202,7 @@ class AaMainFragment : BaseFragment<FragmentAaMainBinding>(FragmentAaMainBinding
                             ContextCompat.registerReceiver(this@AaMainFragment.requireContext(), broadcastReceiver, IntentFilter().apply {
                                 addAction(AABroadcastConst.ACTION_SCREEN_CONTROL)
                                 addAction(AABroadcastConst.ACTION_STEERING_WHEEL_CONTROL)
+                                addAction(AABroadcastConst.ACTION_SESSION_CONTROL)
                             }, ContextCompat.RECEIVER_EXPORTED)
 
                         }

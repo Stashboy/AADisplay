@@ -15,7 +15,6 @@ import io.github.nitsuya.aa.display.util.AADisplayConfig
 import io.github.nitsuya.aa.display.xposed.util.Instances
 import io.github.nitsuya.template.bases.runIO
 import io.github.nitsuya.template.bases.runMain
-import io.github.qauxv.ui.CommonContextWrapper
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
@@ -210,7 +209,6 @@ class CoreManagerService private constructor(): ICoreManager.Stub() {
             )
             mAaVirtualDisplayAdapter?.apply {
                 onReconnected(profile.width, profile.height, profile.densityDpi)
-                mDisplayWindow?.onResume(profile.width, profile.height)
                 listener.onAvailableDisplay(this.mDisplayId, false)
                 return@runMain
             }
@@ -223,14 +221,6 @@ class CoreManagerService private constructor(): ICoreManager.Stub() {
                 onConnected(profile.width, profile.height, profile.densityDpi){ displayId ->
                     listener.onAvailableDisplay(displayId, true)
                 }
-                mDisplayWindow?.onDestroyPromptly()
-                mDisplayWindow = DisplayWindow(
-                    CommonContextWrapper.createAppCompatContext(systemContext),
-                    this,
-                    profile.width,
-                    profile.height,
-                    profile.densityDpi
-                )
             }
         }
     }
@@ -243,11 +233,16 @@ class CoreManagerService private constructor(): ICoreManager.Stub() {
 
     override fun onDestroyDisplay(){
         runMain {
-            mDisplayWindow?.onDestroy {
+            val finishDestroy = {
                 mAaVirtualDisplayAdapter?.onDestroy()
                 mDisplayWindow = null
                 mAaVirtualDisplayAdapter = null
                 clearDisplayProfileLock()
+            }
+            mDisplayWindow?.onDestroy {
+                finishDestroy()
+            } ?: run {
+                finishDestroy()
             }
         }
     }
@@ -307,7 +302,6 @@ class CoreManagerService private constructor(): ICoreManager.Stub() {
 
     override fun touch(event: MotionEvent) {
         runBlocking(Dispatchers.IO) {
-//        runMain {
             mAaVirtualDisplayAdapter?.onTouch(event)
         }
     }

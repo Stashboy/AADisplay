@@ -9,22 +9,9 @@ import android.view.MotionEvent
 import android.view.Surface
 import android.view.SurfaceControl
 import io.github.nitsuya.aa.display.model.RecentTask
-import io.github.nitsuya.template.bases.runIO
-import java.lang.reflect.InvocationHandler
-import java.lang.reflect.Method
-import java.lang.reflect.Proxy
 
 object CoreManager : ICoreManager, DeathRecipient {
     private const val TAG = "CoreManager"
-
-    private class ServiceProxy(private val obj: ICoreManager) : InvocationHandler {
-        override fun invoke(proxy: Any?, method: Method, args: Array<out Any?>?): Any? {
-            val result = method.invoke(obj, *args.orEmpty())
-            if (result == null) Log.i(TAG, "Call service method ${method.name}")
-            else Log.i(TAG, "Call service method ${method.name} with result " + result.toString().take(20))
-            return result
-        }
-    }
 
     @Volatile
     private var service: ICoreManager? = null
@@ -150,11 +137,7 @@ object CoreManager : ICoreManager, DeathRecipient {
         if (remote != null) {
             Log.i(TAG, "Binder acquired")
             remote.asBinder().linkToDeath(this, 0)
-            service = Proxy.newProxyInstance(
-                javaClass.classLoader,
-                arrayOf(ICoreManager::class.java),
-                ServiceProxy(remote)
-            ) as ICoreManager
+            service = remote
         }
         return service
     }

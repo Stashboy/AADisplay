@@ -194,7 +194,6 @@ object AaUiHook: AaHook() {
 
     private fun hookFacetBar(config: SharedPreferences) {
         val enableDefVoiceAssist = AADisplayConfig.VoiceAssistShell.get(config).isNullOrBlank()
-        val closeLauncherDashboard = AADisplayConfig.CloseLauncherDashboard.get(config)
         val autoOpen = AADisplayConfig.AutoOpen.get(config)
         findMethod(LayoutInflater::class.java) {
             name == "inflate"
@@ -213,11 +212,15 @@ object AaUiHook: AaHook() {
             val resultViewGroupParent = (resultViewGroup.parent as ViewGroup?)?.apply {
                 removeView(resultViewGroup)
             }
-            if(closeLauncherDashboard){
-                resultViewGroup.findViewById<View>(resIdLauncherAndDashboardIconId).apply {
-                    setOnClickFinallyListener {
-                        performLongClick()
-                    }
+            resultViewGroup.findViewById<View>(resIdLauncherAndDashboardIconId).apply {
+                // Keep default Android Auto launcher behavior, but also terminate current
+                // AADisplay session so re-entering from the app icon always starts clean.
+                setOnClickFinallyListener {
+                    ctx.sendBroadcast(Intent().apply {
+                        action = AABroadcastConst.ACTION_SESSION_CONTROL
+                        putExtra(AABroadcastConst.EXTRA_SESSION_ACTION, AABroadcastConst.SESSION_ACTION_EXIT)
+                    })
+                    performOriClick()
                 }
             }
             val aaFacetBar = layoutInflater.inflate(R.layout.aa_facet_bar, resultViewGroupParent, false) as ConstraintLayout

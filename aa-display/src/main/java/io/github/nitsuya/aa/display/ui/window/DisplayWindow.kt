@@ -173,14 +173,8 @@ class DisplayWindow(
                     toggleDisplayPower(false)
                 }
             }
-            ibMirrorDisplay.setOnClickListener {
-                hideController()
-                showMirror()
-            }
-            ibMirrorDisplay.setOnLongClickListener {
-                collapseController()
-                true
-            }
+            // Disable phone-side mirror/taskview entry point.
+            ibMirrorDisplay.visibility = View.GONE
             ibExpand.setOnClickListener {
                 expandController()
             }
@@ -324,7 +318,7 @@ class DisplayWindow(
 
     private fun updateDipslaySize(){
         mControllerBinding?.apply {
-            ibMirrorDisplay.visibility = View.VISIBLE
+            ibMirrorDisplay.visibility = View.GONE
         }
         mDisplayRatio = Instances.windowManager.currentWindowMetrics.bounds.let {
             (it.width().toFloat() / mDisplayWidth).coerceAtMost(it.height().toFloat() / mDisplayHeight)
@@ -347,9 +341,8 @@ class DisplayWindow(
         updateDipslaySize()
         mControllerBinding?.apply {
             tvDestroyTime.visibility = View.GONE
-            ibMirrorDisplay.visibility = View.VISIBLE
+            ibMirrorDisplay.visibility = View.GONE
         }
-        showController()
     }
 
     suspend fun onDestroyPromptly() {
