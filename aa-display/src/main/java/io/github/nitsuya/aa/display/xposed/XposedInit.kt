@@ -12,6 +12,7 @@ import io.github.nitsuya.aa.display.xposed.hook.AndroidHook
 import io.github.nitsuya.aa.display.xposed.hook.BaseHook
 import io.github.nitsuya.aa.display.xposed.hook.LauncherHook
 import io.github.nitsuya.aa.display.xposed.hook.OtherHook
+import io.github.nitsuya.aa.display.xposed.hook.WazeHook
 
 class XposedInit : IXposedHookZygoteInit, IXposedHookLoadPackage{
     companion object {
@@ -27,6 +28,7 @@ class XposedInit : IXposedHookZygoteInit, IXposedHookLoadPackage{
         when{
             packageName == "android" && lpparam.appInfo == null -> arrayOf(AndroidHook)
             packageName == "com.google.android.projection.gearhead" -> arrayOf(AndroidAuoHook)
+            packageName == "com.waze" -> arrayOf(OtherHook, WazeHook)
             packageName == BuildConfig.APPLICATION_ID || lpparam.appInfo == null || lpparam.appInfo.uid == 1000 -> null
             //packageName == AADisplayConfig.LauncherPackage.get(CoreManagerService.config) -> arrayOf(LauncherHook)
             else -> arrayOf(OtherHook)

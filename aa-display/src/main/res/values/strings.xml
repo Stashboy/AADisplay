@@ -14,6 +14,9 @@
     <string name="menu_github">GitHub</string>
     <string name="auto_open_title">Auto Open</string>
     <string name="auto_open_summary">Automatically open app when Android Auto is connected</string>
+    <string name="disable_waze_on_aa_title">Disable Waze on AA</string>
+    <string name="disable_waze_on_aa_summary">This will keep the map open on your device, not AA</string>
+    <string name="disable_waze_on_aa_apply_failed">Failed to apply Disable Waze on AA setting</string>
     <string name="default_launch_package_title">Default Launch Package</string>
     <string name="default_launch_package_summary">App package launched when AADisplay starts</string>
     <string name="default_launch_package_empty">Default Launch Package is required</string>

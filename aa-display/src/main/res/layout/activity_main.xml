@@ -152,6 +152,40 @@
                         android:layout_centerVertical="true" />
                 </RelativeLayout>
 
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_toStartOf="@id/switch_disable_waze_on_aa"
+                        android:orientation="vertical">
+
+                        <com.google.android.material.textview.MaterialTextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/disable_waze_on_aa_title"
+                            android:textAppearance="?textAppearanceTitleMedium" />
+
+                        <com.google.android.material.textview.MaterialTextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/disable_waze_on_aa_summary"
+                            android:textAppearance="?textAppearanceBodyMedium"
+                            android:textColor="?android:attr/textColorSecondary" />
+                    </LinearLayout>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switch_disable_waze_on_aa"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true" />
+                </RelativeLayout>
+
                 <com.google.android.material.textview.MaterialTextView
                     android:id="@+id/tv_default_home"
                     android:layout_width="match_parent"
