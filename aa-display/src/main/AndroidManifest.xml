@@ -62,17 +62,6 @@
                 <category android:name="com.google.android.gms.car.category.CATEGORY_PROJECTION_OEM" />
             </intent-filter>
         </service>
-<!--
-        <service
-            android:name=".service.AaControlService"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher"
-            android:label="AAControl" >
-            <intent-filter>
-                <action android:name="android.media.browse.MediaBrowserService" />
-            </intent-filter>
-        </service>
--->
         <service
             android:name=".service.ShellManagerService"
             android:enabled="true"

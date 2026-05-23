@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.23.4 (2026-05-23)
+
+### Added
+- Separate production toggle for Google Maps-on-phone while Android Auto remains connected:
+  - new persisted setting `DisableGoogleMapsOnAa`
+  - component-level enable/disable manager for Maps projection services + ghost activity
+
+### Changed
+- Production version updated to:
+  - `versionName`: `0.23#16.8-r1`
+  - `versionCode`: `3006`
+- Waze component toggle execution now uses the same success gating strategy as Google Maps (all component operations must succeed before returning success).
+
+### Fixed
+- Android Auto UI/resource hook stability:
+  - `AaUiHook` now skips optional hooks when required resources are missing instead of asserting/crashing.
+  - projection decoration constructor hook now uses compatible constructor matching rather than hard-coded constructor lookup.
+- Gearhead phenotype property hook robustness:
+  - `AaPropsHook` now resolves string fields dynamically to reduce obfuscation fragility.
+
+### Cleanup
+- Removed dead/unused code and assets not used by current production flow:
+  - removed `AaControlService`, `AaCarService`, `SettingsActivity`, legacy `LauncherHook`, deprecated pref XML, and orphaned resources.
+- Removed obsolete global build-feature flag from `gradle.properties` (now explicitly configured in module build config).
+
+### Evidence / Validation
+- Built successfully:
+  - `:aa-display:assembleRelease`
+  - `:aa-display:lintDebug`
+- Verified on connected device app targets:
+  - Android Auto `16.8.661854-release`
+  - Google Maps `26.20.01.913318892`
+  - Waze `5.18.5.6`
+- Waze and Maps toggles validated as separate independent controls in app flow.
+
 ## 0.23.3 (2026-05-05)
 
 ### Added

@@ -6,7 +6,6 @@ import android.database.Cursor
 import android.database.MatrixCursor
 import android.database.MergeCursor
 import android.net.Uri
-import com.github.kyuubiran.ezxhelper.utils.field
 import com.github.kyuubiran.ezxhelper.utils.findMethod
 import com.github.kyuubiran.ezxhelper.utils.hookAfter
 import com.github.kyuubiran.ezxhelper.utils.loadClass
@@ -21,19 +20,16 @@ import org.luckypray.dexkit.query.enums.StringMatchType
 import org.luckypray.dexkit.query.matchers.MethodMatcher
 import java.lang.reflect.Field
 import java.lang.reflect.Method
-import java.lang.reflect.Modifier
 import java.util.HashMap
 
 object AaPropsHook: AaHook() {
     override val tagName: String = "AAD_AaPropsHook"
+    private const val GEARHEAD_PHENOTYPE_GROUP = "com.google.android.projection.gearhead"
 
     private lateinit var method: Method
-    private lateinit var groupField: Field
-    private lateinit var keyField: Field
-//    private lateinit var defValueField: Field
+    private lateinit var stringFields: List<Field>
 
     override fun isSupportProcess(processName: String): Boolean {
-        //return processMain == processName || processProjection == processName || processCar == processName
         return true
     }
 
@@ -45,74 +41,58 @@ object AaPropsHook: AaHook() {
                 false
             )
         }
-//        val fieldName = arrayOf(/*"b", "c",*/ "e")
-        val fieldName = arrayOf("a", "b")
-        val fieldsInfo = linkedMapOf(
-            fieldName[0] to "java.lang.String", //groupField
-            fieldName[1] to "java.lang.String", //keyField
-//            fieldName[2] to "java.lang.Object"  //defValueField
-        )
         val classes = bridge.findClass {
             searchPackages = listOf("")
             matcher {
-                fields {
-                    fieldsInfo.forEach { (name, typeName) ->
-                        add {
-                            modifiers(Modifier.PUBLIC)
-                            type(typeName)
-                            name(name)
-                        }
-                    }
-                }
                 methods {
                     add(methodMatcher)
                 }
             }
         }
         if (classes.isEmpty() || classes.size > 1) {
-            throw NoSuchMethodException("AaPropsHook: not found props class：${classes.size}")
+            throw NoSuchMethodException("AaPropsHook: not found props class: ${classes.size}")
         }
         val methodDatas = classes[0].getMethods().findMethod(FindMethod().matcher(methodMatcher))
         if (methodDatas.isEmpty() || methodDatas.size > 1) {
-            throw NoSuchMethodException("AaPropsHook: not found props method：${classes.size}")
+            throw NoSuchMethodException("AaPropsHook: not found props method: ${classes.size}")
         }
         val methodData = methodDatas[0]
         val clazz = loadClass(methodData.className)
-        groupField = clazz.field(fieldName[0]) //com.google.android.projection.gearhead
-        keyField = clazz.field(fieldName[1]) //Coolwalk__enabled
-//        defValueField = clazz.field(fieldName[2]) //true
-        log(tagName, "$clazz#${methodData.methodName}#${fieldName.joinToString()}")
+        stringFields = buildStringFieldList(clazz)
+        if (stringFields.isEmpty()) {
+            throw NoSuchFieldException("AaPropsHook: no non-static String fields found in ${clazz.name}")
+        }
+        log(tagName, "$clazz#${methodData.methodName}#stringFields=${stringFields.joinToString { it.name }}")
         method = findMethod(clazz) {
             name == methodData.methodName
-//            && parameterCount == 1
         }
     }
 
     override fun hook(config: SharedPreferences, lpparam: XC_LoadPackage.LoadPackageParam) {
-        hookComGoogleAndroidProjectionGearheadProps(config, lpparam)
-        hookComGoogleAndroidGmsCarProps(config, lpparam)
+        hookComGoogleAndroidProjectionGearheadProps(config)
+        hookComGoogleAndroidGmsCarProps(config)
     }
 
-    private fun hookComGoogleAndroidProjectionGearheadProps(config: SharedPreferences?, lpparam: XC_LoadPackage.LoadPackageParam) {
+    private fun hookComGoogleAndroidProjectionGearheadProps(config: SharedPreferences?) {
         val props = AADisplayConfig.ComGoogleAndroidProjectionGearheadProps.get(config) ?: return
         if (props.isEmpty) {
             return
         }
+        val propKeys = props.keys.mapNotNull { it as? String }.toSet()
         val keyValue = HashMap<String, Any?>(props.size, 1f)
         method.hookAfter { param ->
             val thisObject = param.thisObject
-            val group = groupField.get(thisObject)
-            if (group != "com.google.android.projection.gearhead") {
+            val groupAndKey = resolveGroupAndKey(thisObject, propKeys) ?: return@hookAfter
+            val group = groupAndKey.first
+            val key = groupAndKey.second
+            if (group != GEARHEAD_PHENOTYPE_GROUP) {
                 return@hookAfter
             }
-            val key = keyField.get(thisObject) as String
-            if (!props.containsKey(key)){
+            if (!props.containsKey(key)) {
                 return@hookAfter
             }
             val value = keyValue.computeIfAbsent(key) {
-//                val defValue = defValueField.get(thisObject) ?: return@computeIfAbsent null
                 val value = props[key] as String
-                //log(tagName, "$key,$value,${defValue}")
                 log(tagName, "$key,$value")
                 try {
                     when (param.result?.javaClass ?: return@computeIfAbsent null) {
@@ -123,14 +103,14 @@ object AaPropsHook: AaHook() {
                         else -> {
                             val result = param.result
                             value.split(",").forEach { item ->
-                                val (key, type, value) = item.split("@", limit = 3)
+                                val (keyName, type, valueRaw) = item.split("@", limit = 3)
                                 result.putObject(
-                                    key,
-                                    when(type){
-                                        "String" -> value
-                                        "Int" -> value.toInt()
-                                        "Boolean" -> value.toBoolean()
-                                        "Long" -> value.toLong()
+                                    keyName,
+                                    when (type) {
+                                        "String" -> valueRaw
+                                        "Int" -> valueRaw.toInt()
+                                        "Boolean" -> valueRaw.toBoolean()
+                                        "Long" -> valueRaw.toLong()
                                         else -> return@forEach
                                     }
                                 )
@@ -139,7 +119,7 @@ object AaPropsHook: AaHook() {
                         }
                     }
                 } catch (e: Throwable) {
-                    log(tagName,"Android Auto[com.google.android.projection.gearhead] config, $key=$value convert exception", e)
+                    log(tagName, "Android Auto[$GEARHEAD_PHENOTYPE_GROUP] config, $key=$value convert exception", e)
                     null
                 }
             }
@@ -149,7 +129,7 @@ object AaPropsHook: AaHook() {
         }
     }
 
-    private fun hookComGoogleAndroidGmsCarProps(config: SharedPreferences?, lpparam: XC_LoadPackage.LoadPackageParam) {
+    private fun hookComGoogleAndroidGmsCarProps(config: SharedPreferences?) {
         val props = AADisplayConfig.ComGoogleAndroidGmsCarProps.get(config) ?: return
         if (props.isEmpty) {
             return
@@ -161,29 +141,57 @@ object AaPropsHook: AaHook() {
                 }
             }
             findMethod(ContentResolver::class.java) {
-                name == "query"
-                && parameterCount == 5
-                && parameterTypes[0] == Uri::class.java             // uri
-                && parameterTypes[1] == Array<String>::class.java   // projection
-                && parameterTypes[2] == String::class.java          // selection
-                && parameterTypes[3] == Array<String>::class.java   // selectionArgs
-                && parameterTypes[4] == String::class.java          // sortOrder
+                name == "query" &&
+                    parameterCount == 5 &&
+                    parameterTypes[0] == Uri::class.java &&
+                    parameterTypes[1] == Array<String>::class.java &&
+                    parameterTypes[2] == String::class.java &&
+                    parameterTypes[3] == Array<String>::class.java &&
+                    parameterTypes[4] == String::class.java
             }.hookAfter { param ->
                 val uri = param.args[0] as Uri
                 if (uri.authority != "com.google.android.gms.phenotype") return@hookAfter
-                //log(tagName, "ContentProvider.query: uri: $uri")
                 if (uri.path != "/com.google.android.gms.car") return@hookAfter
-                //log(AaUiHook.tagName, "GmsCarProps-----${lpparam.processName}------")
-                param.result = if (param.result == null) matrixCursor else MergeCursor(
-                    arrayOf(
-                        param.result as Cursor,
-                        matrixCursor
-                    )
-                )
+                param.result = if (param.result == null) {
+                    matrixCursor
+                } else {
+                    MergeCursor(arrayOf(param.result as Cursor, matrixCursor))
+                }
             }
         } catch (e: Throwable) {
             log(tagName, "[com.google.android.gms.car] config", e)
         }
     }
 
+    private fun buildStringFieldList(clazz: Class<*>): List<Field> {
+        val result = linkedSetOf<Field>()
+        var current: Class<*>? = clazz
+        while (current != null && current != Any::class.java) {
+            current.declaredFields
+                .filter { !java.lang.reflect.Modifier.isStatic(it.modifiers) && it.type == String::class.java }
+                .forEach { field ->
+                    field.isAccessible = true
+                    result.add(field)
+                }
+            current = current.superclass
+        }
+        return result.toList()
+    }
+
+    private fun resolveGroupAndKey(thisObject: Any, propKeys: Set<String>): Pair<String, String>? {
+        var group: String? = null
+        var key: String? = null
+        stringFields.forEach { field ->
+            val value = runCatching { field.get(thisObject) as? String }.getOrNull() ?: return@forEach
+            if (value == GEARHEAD_PHENOTYPE_GROUP) {
+                group = value
+                return@forEach
+            }
+            if (key == null && propKeys.contains(value)) {
+                key = value
+            }
+        }
+        if (group == null || key == null) return null
+        return Pair(group!!, key!!)
+    }
 }

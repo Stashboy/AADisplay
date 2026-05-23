@@ -5,12 +5,12 @@
 ![Android SDK min 31](https://img.shields.io/badge/Android%20SDK-%3E%3D%2031-brightgreen?logo=android)
 ![Android SDK target 36](https://img.shields.io/badge/Android%20SDK-target%2036-brightgreen?logo=android)
 
-Production-ready fork of [Nitsuya/AADisplay](https://github.com/Nitsuya/AADisplay), focused on Android Auto 16.6 compatibility, TaskView stability, and reliable display sizing behavior.
+Production-ready fork of [Nitsuya/AADisplay](https://github.com/Nitsuya/AADisplay), focused on Android Auto 16.x compatibility, TaskView stability, and reliable display sizing behavior.
 
 ## Version
 
-- Current module version: `0.23#16.6-r5`
-- See [CHANGELOG.md](CHANGELOG.md) and [RELEASE_NOTES_v0.23.5.md](RELEASE_NOTES_v0.23.5.md)
+- Current module version: `0.23#16.8-r1`
+- See [CHANGELOG.md](CHANGELOG.md) and [RELEASE_NOTES_v0.23.4.md](RELEASE_NOTES_v0.23.4.md)
 
 ## Requirements
 
@@ -26,10 +26,11 @@ Production-ready fork of [Nitsuya/AADisplay](https://github.com/Nitsuya/AADispla
    - System Framework
 3. Reboot device.
 4. Open AADisplay and configure:
-   - Auto Open
-   - Disable Waze on AA
-   - Default Launch Package
-   - Delay Destroy Time
+    - Auto Open
+    - Disable Waze on AA
+    - Disable Google Maps on AA
+    - Default Launch Package
+    - Delay Destroy Time
 
 ## Build
 

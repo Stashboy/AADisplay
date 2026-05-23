@@ -2,7 +2,6 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     //kotlin("android")
-    id("kotlin-android")
     id("dev.rikka.tools.refine") version "4.4.0"
 }
 
@@ -14,8 +13,8 @@ android {
         applicationId = "io.github.nitsuya.aa.display"
         minSdk = 31
         targetSdk = 36
-        versionCode = 3005
-        versionName = "0.23#16.6-r5"
+        versionCode = 3006
+        versionName = "0.23#16.8-r1"
         buildConfigField("long", "BUILD_TIME", buildTime.toString())
     }
 
@@ -55,20 +54,12 @@ android {
             sourceSets.getByName("main").java.srcDir(File("build/generated/ksp/release/kotlin"))
         }
         getByName("debug") {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-            // 如果环境变量存在且签名配置有效，使用 release 签名，否则使用默认调试签名
+            // Keep debug artifacts unminified to avoid AGP warnings and speed up test builds.
+            isMinifyEnabled = false
+            isShrinkResources = false
             if (System.getenv("KEY_ANDROID") != null) {
                 signingConfig = signingConfigs.getByName("release")
             }
-//            proguardFiles(
-//                getDefaultProguardFile("proguard-android-optimize.txt"),
-//                "proguard-rules.pro"
-//            )
         }
 
     }
@@ -91,6 +82,7 @@ android {
         languageVersion = "2.0"
     }
     buildFeatures {
+        buildConfig = true
         viewBinding = true
         aidl = true
     }

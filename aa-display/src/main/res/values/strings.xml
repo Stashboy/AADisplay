@@ -2,13 +2,11 @@
     <string name="app_name">AADisplay</string>
     <string name="unknown_error">unknown error</string>
     <string name="details">details</string>
-    <string name="settings">settings</string>
     <string name="xposeddescription">AADisplay</string>
     <string name="info_system_version">System Version</string>
     <string name="info_root_privilege">Root Privilege</string>
     <string name="activated">Activated</string>
     <string name="need_reboot">Need Reboot</string>
-    <string name="need_LSPosed">Need LSPosed</string>
     <string name="not_activated">Not Activated</string>
     <string name="reboot">Reboot</string>
     <string name="menu_github">GitHub</string>
@@ -17,6 +15,9 @@
     <string name="disable_waze_on_aa_title">Disable Waze on AA</string>
     <string name="disable_waze_on_aa_summary">This will keep the map open on your device, not AA</string>
     <string name="disable_waze_on_aa_apply_failed">Failed to apply Disable Waze on AA setting</string>
+    <string name="disable_google_maps_on_aa_title">Disable Google Maps on AA</string>
+    <string name="disable_google_maps_on_aa_summary">This will keep Google Maps on your device, not AA</string>
+    <string name="disable_google_maps_on_aa_apply_failed">Failed to apply Disable Google Maps on AA setting</string>
     <string name="default_launch_package_title">Default Launch Package</string>
     <string name="default_launch_package_summary">App package launched when AADisplay starts</string>
     <string name="default_launch_package_empty">Default Launch Package is required</string>

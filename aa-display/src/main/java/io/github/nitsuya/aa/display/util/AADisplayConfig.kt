@@ -16,6 +16,7 @@ sealed class AADisplayConfig<T>(val key: String) {
     object HomePackage: StringConfig("HomePackage", "com.ss.squarehome2")
     object AutoOpen: BooleanConfig("AutoOpen", true)
     object DisableWazeOnAa: BooleanConfig("DisableWazeOnAa", false)
+    object DisableGoogleMapsOnAa: BooleanConfig("DisableGoogleMapsOnAa", false)
     object VirtualDisplayDpi: IntConfig("VirtualDisplayDpi", 0)
     object AndroidAutoDpi: IntConfig("AndroidAutoDpi", 0)
     object DelayDestroyTime: IntConfig("DelayDestroyTime", 180)
@@ -28,7 +29,6 @@ sealed class AADisplayConfig<T>(val key: String) {
     object DestroyVirtualDisplayAfter: ArrayStringConfig("DestroyVirtualDisplayAfter")
     object ComGoogleAndroidGmsCarProps: PropertiesConfig("ComGoogleAndroidGmsCarProps")
     object ComGoogleAndroidProjectionGearheadProps: PropertiesConfig("ComGoogleAndroidProjectionGearheadProps")
-    object LauncherModeProps: PropertiesConfig("LauncherModeProps")
 
 
     abstract class StringConfig(key: String, private val defValue: String? = null): AADisplayConfig<String?>(key){

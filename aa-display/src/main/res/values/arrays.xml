@@ -7,13 +7,4 @@
         <item>com.ss.squarehome2</item>
     </string-array>
 
-    <string-array name="ime_policy_keys">
-        <item>Virtual display</item>
-        <item>Primary display</item>
-    </string-array>
-
-    <string-array name="ime_policy_values">
-        <item>0</item>
-        <item>1</item>
-    </string-array>
 </resources>

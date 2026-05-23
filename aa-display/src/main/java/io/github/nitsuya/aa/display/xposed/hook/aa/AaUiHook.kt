@@ -3,8 +3,6 @@ package io.github.nitsuya.aa.display.xposed.hook.aa
 import android.content.ComponentName
 import android.content.Intent
 import android.content.SharedPreferences
-import android.content.pm.PackageManager
-import android.os.Bundle
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
@@ -14,7 +12,6 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
 import com.github.kyuubiran.ezxhelper.init.InitFields
 import com.github.kyuubiran.ezxhelper.utils.argTypes
-import com.github.kyuubiran.ezxhelper.utils.findConstructor
 import com.github.kyuubiran.ezxhelper.utils.findMethod
 import com.github.kyuubiran.ezxhelper.utils.getIdByName
 import com.github.kyuubiran.ezxhelper.utils.getObjectOrNull
@@ -51,10 +48,10 @@ object AaUiHook: AaHook() {
 
     private var resLayoutGhFacetBarId: Int = 0
     private var resIdStatusBarId: Int = 0
-    private var resIdAssistantIconContainerId: Int = 0
-    private var resIdAssistantIconId: Int = 0
     private var resIdLauncherAndDashboardIconContainerId: Int = 0
     private var resIdLauncherAndDashboardIconId: Int = 0
+    private var canHookLayout: Boolean = false
+    private var canHookFacetBar: Boolean = false
 
     override fun isSupportProcess(processName: String): Boolean {
         return processProjection == processName
@@ -85,47 +82,43 @@ object AaUiHook: AaHook() {
         }
 
         resLayoutGhFacetBarId = InitFields.appContext.resources.getIdentifier("gh_coolwalk_vertical_facet_bar", "layout", InitFields.appContext.packageName)
-        resIdStatusBarId = getIdByName("status_bar")//android.support.p001v4.app.FragmentContainerView
-        resIdAssistantIconContainerId = getIdByName("assistant_icon_container")//com.google.android.apps.auto.components.coolwalk.focusring.FocusInterceptor
-        resIdAssistantIconId = getIdByName("assistant_icon")//com.google.android.apps.auto.components.coolwalk.button.CoolwalkButton
-        resIdLauncherAndDashboardIconContainerId = getIdByName("launcher_and_dashboard_icon_container")//com.google.android.apps.auto.components.coolwalk.focusring.FocusInterceptor
-        resIdLauncherAndDashboardIconId = getIdByName("launcher_and_dashboard_icon")//com.google.android.apps.auto.components.coolwalk.button.CoolwalkButton
+        resIdStatusBarId = getIdByName("status_bar")
+        resIdLauncherAndDashboardIconContainerId = getIdByName("launcher_and_dashboard_icon_container")
+        resIdLauncherAndDashboardIconId = getIdByName("launcher_and_dashboard_icon")
 
         resLayoutLeftResourceId = InitFields.appContext.resources.getIdentifier("sys_ui_layout_canonical_vertical_rail_lhd", "layout", InitFields.appContext.packageName)
         resLayoutRightResourceId = InitFields.appContext.resources.getIdentifier("sys_ui_layout_canonical_vertical_rail_rhd", "layout", InitFields.appContext.packageName)
 
-        assert(resLayoutGhFacetBarId != 0) { "resLayoutGhFacetBarId not fund" }
-        assert(resIdStatusBarId != 0) { "resIdStatusBarId not fund" }
-        assert(resIdAssistantIconContainerId != 0) { "resIdAssistantIconContainerId not fund" }
-        assert(resIdAssistantIconId != 0) { "resIdAssistantIconId not fund" }
-        assert(resIdLauncherAndDashboardIconContainerId != 0) { "resIdLauncherAndDashboardIconContainerId not fund" }
-        assert(resIdLauncherAndDashboardIconId != 0) { "resIdLauncherAndDashboardIconId not fund" }
-
-        assert(resLayoutLeftResourceId != 0) { "resLayoutLeftResourceId not fund" }
-        assert(resLayoutRightResourceId != 0) { "resLayoutRightResourceId not fund" }
-
-
+        canHookLayout = resLayoutLeftResourceId != 0 && resLayoutRightResourceId != 0
+        if (!canHookLayout) {
+            log(
+                tagName,
+                "AaUiHook: skip layout override, missing canonical layout resources: lhd=$resLayoutLeftResourceId, rhd=$resLayoutRightResourceId"
+            )
+        }
+        canHookFacetBar =
+            resLayoutGhFacetBarId != 0 &&
+            resIdStatusBarId != 0 &&
+            resIdLauncherAndDashboardIconContainerId != 0 &&
+            resIdLauncherAndDashboardIconId != 0
+        if (!canHookFacetBar) {
+            log(
+                tagName,
+                "AaUiHook: skip facet-bar override, missing resources: facet=$resLayoutGhFacetBarId, status=$resIdStatusBarId, launcherContainer=$resIdLauncherAndDashboardIconContainerId, launcherIcon=$resIdLauncherAndDashboardIconId"
+            )
+        }
     }
 
     override fun hook(config: SharedPreferences, lpparam: XC_LoadPackage.LoadPackageParam) {
         log(tagName,  "AaUiHook: ~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         hookBaseClick()
-        hookLayout()
-        hookFacetBar(config)
+        if (canHookLayout) {
+            hookLayout()
+        }
+        if (canHookFacetBar) {
+            hookFacetBar(config)
+        }
         hookRadius(config)
-    }
-
-    private fun printBundle(extras: Bundle, index: Int): String{
-        val keys = extras.keySet()
-        return keys.joinToString { it } + " \r\n " + keys.mapNotNull { key ->
-            val value = extras.get(key)
-            if (value == null) "$key -> null"
-            if (value is Bundle) {
-                "$key -> Type:Bundle, ${printBundle(value, index + 1)}"
-            } else {
-                "$key -> ${value.toString()}, Type:${value!!::class.java.name}"
-            }
-        }.joinToString(separator = "\r\n", prefix = "    ".repeat(index)) { it }
     }
 
     private fun hookLayout() {
@@ -193,7 +186,6 @@ object AaUiHook: AaHook() {
     }
 
     private fun hookFacetBar(config: SharedPreferences) {
-        val enableDefVoiceAssist = AADisplayConfig.VoiceAssistShell.get(config).isNullOrBlank()
         val closeLauncherDashboard = AADisplayConfig.CloseLauncherDashboard.get(config)
         val autoOpen = AADisplayConfig.AutoOpen.get(config)
         findMethod(LayoutInflater::class.java) {
@@ -282,39 +274,6 @@ object AaUiHook: AaHook() {
                     setPadding(0, 5, 0, 5)
                 },
             )
-//                createBtn(R.drawable.ic_aa_filter_none_44){
-//                    val intentClick = Intent().apply {
-//                        action = AABroadcastConst.ACTION_SCREEN_CONTROL
-//                        putExtra(AABroadcastConst.EXTRA_ACTION, KeyEvent.KEYCODE_DEMO_APP_1)
-//                    }
-//                    setOnClickListener {
-//                        ctx.sendBroadcast(intentClick)
-//                    }
-//                    setPadding(0, 5, 0, 2)
-//                },
-//                createBtn(R.drawable.ic_aa_phone_44){
-//                    val intentClick = Intent().apply {
-//                        action = AABroadcastConst.ACTION_SCREEN_CONTROL
-//                        putExtra(AABroadcastConst.EXTRA_ACTION, KeyEvent.KEYCODE_FEATURED_APP_1)
-//                    }
-//                    setOnClickListener {
-//                        ctx.sendBroadcast(intentClick)
-//                    }
-//                    setPadding(0, 5, 0, 10)
-//                },
-//                resultViewGroup.findViewById<View>(resIdAssistantIconId).run {
-//                    if(!enableDefVoiceAssist){
-//                        val intentClick = Intent().apply {
-//                            action = AABroadcastConst.ACTION_SCREEN_CONTROL
-//                            putExtra(AABroadcastConst.EXTRA_ACTION, KeyEvent.KEYCODE_SEARCH)
-//                        }
-//                        setOnClickFinallyListener {
-//                            ctx.sendBroadcast(intentClick)
-//                        }
-//                    }
-//                    resIdAssistantIconContainerId
-//                },
-//          arrayListOf(resIdStatusBarId, resIdLauncherAndDashboardIconContainerId, resIdAssistantIconContainerId).forEach { vId ->
             arrayListOf(resIdStatusBarId, resIdLauncherAndDashboardIconContainerId).forEach { vId ->
                 val view = resultViewGroup.findViewById<View>(vId)
                 (view.parent as ViewGroup?)?.apply {
@@ -322,26 +281,6 @@ object AaUiHook: AaHook() {
                 }
                 aaFacetBar.addView(view)
             }
-//            val statusBarOverlayId = View(ctx).run {
-//                id = View.generateViewId()
-//                layoutParams = ConstraintLayout.LayoutParams(0, 0)
-//                val intentClick = Intent().apply {
-//                    action = AABroadcastConst.ACTION_SCREEN_CONTROL
-//                    putExtra(AABroadcastConst.EXTRA_ACTION, KeyEvent.KEYCODE_POWER)
-//                }
-//                setOnClickListener {
-//                    ctx.sendBroadcast(intentClick)
-//                }
-//                val statusBar = aaFacetBar.findViewById<ViewGroup>(resIdStatusBarId)
-//                setOnLongClickListener {
-//                    if(statusBar.childCount > 0){
-//                        statusBar.getChildAt(0).performClick()
-//                    }
-//                    true
-//                }
-//                aaFacetBar.addView(this)
-//                id
-//            }
             val set = ConstraintSet()
             set.clone(aaFacetBar)
             bottomIds.forEachIndexed { index, vId ->
@@ -354,10 +293,6 @@ object AaUiHook: AaHook() {
                 set.connect(vId, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END, 0)
                 set.connect(vId, ConstraintSet.START, ConstraintSet.PARENT_ID, ConstraintSet.START, 0)
             }
-//            set.connect(statusBarOverlayId, ConstraintSet.BOTTOM, resIdStatusBarId, ConstraintSet.BOTTOM, 0)
-//            set.connect(statusBarOverlayId, ConstraintSet.TOP, resIdStatusBarId, ConstraintSet.TOP, 0)
-//            set.connect(statusBarOverlayId, ConstraintSet.END, resIdStatusBarId, ConstraintSet.END, 0)
-//            set.connect(statusBarOverlayId, ConstraintSet.START, resIdStatusBarId, ConstraintSet.START, 0)
             set.applyTo(aaFacetBar)
             resultViewGroup.visibility = View.GONE
             aaFacetBar.addView(resultViewGroup)
@@ -407,19 +342,25 @@ object AaUiHook: AaHook() {
             return
         }
         try{
-            findConstructor("com.google.android.gms.car.ProjectionWindowDecorationParams"){
-                parameterCount == 9
-                && parameterTypes[0] == Int::class.javaPrimitiveType //outlineLeft
-                && parameterTypes[1] == Int::class.javaPrimitiveType //outlineTop
-                && parameterTypes[2] == Int::class.javaPrimitiveType //outlineRight
-                && parameterTypes[3] == Int::class.javaPrimitiveType //outlineBottom
-                && parameterTypes[4] == Int::class.javaPrimitiveType //corners
-                && parameterTypes[5] == Int::class.javaPrimitiveType //cornerRadius
-                && parameterTypes[6] == Int::class.javaPrimitiveType //antiAliasingType
-                && parameterTypes[7] == Boolean::class.javaPrimitiveType //showOutlinesOnlyWhenInset
-                && parameterTypes[8] == Boolean::class.javaPrimitiveType //showRoundedCornersOnlyWhenInset
-            }.hookBefore { param ->
-                param.args[5] = 0
+            val targetClass = loadClass("com.google.android.gms.car.ProjectionWindowDecorationParams")
+            val ctor = targetClass.declaredConstructors.firstOrNull { c ->
+                val p = c.parameterTypes
+                p.size >= 9 &&
+                    p[0] == Int::class.javaPrimitiveType &&
+                    p[1] == Int::class.javaPrimitiveType &&
+                    p[2] == Int::class.javaPrimitiveType &&
+                    p[3] == Int::class.javaPrimitiveType &&
+                    p[4] == Int::class.javaPrimitiveType &&
+                    p[5] == Int::class.javaPrimitiveType &&
+                    p[6] == Int::class.javaPrimitiveType &&
+                    p[7] == Boolean::class.javaPrimitiveType &&
+                    p[8] == Boolean::class.javaPrimitiveType
+            } ?: throw NoSuchMethodException("AaUiHook: ProjectionWindowDecorationParams compatible constructor not found")
+            ctor.isAccessible = true
+            ctor.hookBefore { param ->
+                if (param.args.size > 5 && param.args[5] is Int) {
+                    param.args[5] = 0
+                }
             }
         } catch (e: Throwable) {
             log(tagName, "ProjectionWindowDecorationParams", e)

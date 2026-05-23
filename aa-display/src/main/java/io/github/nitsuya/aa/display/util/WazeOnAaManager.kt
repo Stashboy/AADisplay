@@ -14,8 +14,8 @@ object WazeOnAaManager {
 
     fun apply(disableWazeOnAa: Boolean): Boolean {
         val componentCommand = if (disableWazeOnAa) "disable" else "enable"
-        for (component in targetComponents) {
-            Shell.getShell().newJob().add("pm $componentCommand $component").exec()
+        val componentOpsSucceeded = targetComponents.all { component ->
+            Shell.getShell().newJob().add("pm $componentCommand $component").exec().isSuccess
         }
 
         val setGlobalToggle = Shell.getShell()
@@ -25,6 +25,6 @@ object WazeOnAaManager {
             .isSuccess
         val stopWaze = Shell.getShell().newJob().add("am force-stop $WAZE_PACKAGE").exec().isSuccess
         val stopAa = Shell.getShell().newJob().add("am force-stop $AA_PACKAGE").exec().isSuccess
-        return setGlobalToggle && stopWaze && stopAa
+        return componentOpsSucceeded && setGlobalToggle && stopWaze && stopAa
     }
 }
