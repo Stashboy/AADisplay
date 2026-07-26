@@ -35,7 +35,7 @@ object AaBasicsHook: AaHook() {
         return true
     }
 
-    override fun hook(config: SharedPreferences, lpparam: XC_LoadPackage.LoadPackageParam) {
+    override fun hook(config: SharedPreferences?, lpparam: XC_LoadPackage.LoadPackageParam) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {//11+
             try {
                 findMethod(InstallSourceInfo::class.java) {

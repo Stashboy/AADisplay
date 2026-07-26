@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.23.6 (2026-07-26)
+
+### Changed
+- Production version updated to:
+  - `versionName`: `0.23#17.2-r5`
+  - `versionCode`: `3011`
+- AADisplay now creates its virtual display with the active Android Auto `TextureView` surface immediately instead of creating a surface-less display and attaching later.
+- Default launcher startup now resolves from installed home launchers at runtime when no explicit launch package is configured, avoiding stale hard-coded package defaults.
+
+### Fixed
+- Fixed blank AADisplay rendering on Android Auto `17.2` by preserving the `TextureView` surface, attaching it during virtual-display creation, and reattaching it on reconnect.
+- Prevented duplicate virtual display creation during rapid Android Auto lifecycle callbacks.
+- Made hook preference access resilient under LSPosed by committing preferences synchronously and verifying hook-readable preference files.
+- Android Auto hooks now continue with safe defaults if preference access is temporarily unavailable instead of aborting all hook setup.
+
+### Verification
+- Built successfully:
+  - `:aa-display:assembleRelease`
+- Installed and reboot-tested on the connected device.
+- Live Android Auto validation confirmed:
+  - AADisplay side control panel works
+  - on-device Android Auto controls work
+  - AADisplay opens and renders launcher content
+  - backend virtual display and AA-hosted display both showed the same rendered content
+
 ## 0.23.4 (2026-05-23)
 
 ### Added

@@ -48,12 +48,24 @@ object CoreManager : ICoreManager, DeathRecipient {
         return getService()?.buildTime ?: 0
     }
 
-    override fun onCreateDisplay(with: Int, height: Int, densityDpi: Int, listener: IVirtualDisplayCreatedListener) {
-        getService()?.onCreateDisplay(with, height, densityDpi, listener)
+    override fun onCreateDisplay(with: Int, height: Int, densityDpi: Int, surface: Surface?, listener: IVirtualDisplayCreatedListener) {
+        val remote = getService()
+        if (remote == null) {
+            Log.e(TAG, "onCreateDisplay skipped; service unavailable: ${with}x$height,$densityDpi surface=${surface != null}")
+            return
+        }
+        Log.i(TAG, "onCreateDisplay: ${with}x$height,$densityDpi surface=${surface != null}")
+        remote.onCreateDisplay(with, height, densityDpi, surface, listener)
     }
 
     override fun setDisplaySurface(surface: Surface?) {
-        getService()?.setDisplaySurface(surface)
+        val remote = getService()
+        if (remote == null) {
+            Log.e(TAG, "setDisplaySurface skipped; service unavailable: surface=${surface != null}")
+            return
+        }
+        Log.i(TAG, "setDisplaySurface: surface=${surface != null}")
+        remote.setDisplaySurface(surface)
     }
 
     override fun onDestroyDisplay() {

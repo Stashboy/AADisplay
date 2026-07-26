@@ -1,19 +1,29 @@
 package io.github.nitsuya.aa.display.service;
 
 import android.content.pm.ActivityInfo;
+import android.util.Log;
 import com.google.android.apps.auto.sdk.CarActivity;
 import com.google.android.apps.auto.sdk.CarActivityService;
 import io.github.nitsuya.aa.display.ui.aa.AaDisplayActivity;
 
 public class AaActivityService extends CarActivityService {
+    private static final String TAG = "AADisplay_AaActivityService";
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        Log.i(TAG, "onCreate");
+    }
 
     @Override
     public Class<? extends CarActivity> getCarActivity() {
+        Log.i(TAG, "getCarActivity");
         return AaDisplayActivity.class;
     }
 
     @Override
     public int getHandledConfigChanges() {
+        Log.i(TAG, "getHandledConfigChanges");
         return ActivityInfo.CONFIG_MCC
                 | ActivityInfo.CONFIG_MNC
                 | ActivityInfo.CONFIG_LOCALE

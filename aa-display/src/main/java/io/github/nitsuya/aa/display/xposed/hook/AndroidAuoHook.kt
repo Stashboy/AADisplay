@@ -31,7 +31,7 @@ abstract class AaHook {
     abstract val tagName: String
     abstract fun isSupportProcess(processName: String) : Boolean
     open fun loadDexClass(bridge: DexKitBridge, lpparam: XC_LoadPackage.LoadPackageParam) {}
-    abstract fun hook(config: SharedPreferences, lpparam: XC_LoadPackage.LoadPackageParam)
+    abstract fun hook(config: SharedPreferences?, lpparam: XC_LoadPackage.LoadPackageParam)
 }
 
 object AndroidAuoHook : BaseHook() {
@@ -42,9 +42,16 @@ object AndroidAuoHook : BaseHook() {
         if(hooks.isEmpty()) return
 
         val configPreferences = XSharedPreferences(BuildConfig.APPLICATION_ID, AADisplayConfig.ConfigName)
-        if(!configPreferences.file.canRead()){
-            log(tagName,"load configPreferences fail")
-            return
+        val config = if (configPreferences.file.canRead()) {
+            runCatching {
+                configPreferences.reload()
+            }.onFailure { e ->
+                log(tagName, "configPreferences reload failed; continuing with cached/default values", e)
+            }
+            configPreferences
+        } else {
+            log(tagName, "configPreferences unreadable: ${configPreferences.file}; continuing with defaults")
+            null
         }
 
         var onCreateApplication: XC_MethodHook.Unhook? = null
@@ -69,7 +76,7 @@ object AndroidAuoHook : BaseHook() {
                 log(tagName,"${lpparam.processName} load class measure ${measureTimeMillis}ms")
             }
             hooks.forEach { h ->
-                h.hook(configPreferences, lpparam)
+                h.hook(config, lpparam)
             }
         }
     }

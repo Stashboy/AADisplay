@@ -6,10 +6,11 @@ import android.graphics.SurfaceTexture
 import android.os.SystemClock
 import android.support.car.Car
 import android.support.car.CarConnectionCallback
+import android.util.Log
 import android.view.*
 import androidx.core.content.ContextCompat
 import androidx.core.view.InputDeviceCompat
-import androidx.media.MediaBrowserServiceCompat
+import androidx.core.view.doOnLayout
 import com.github.kyuubiran.ezxhelper.utils.tryOrNull
 import com.google.android.gms.car.CarFirstPartyManager
 import com.topjohnwu.superuser.Shell
@@ -19,6 +20,7 @@ import io.github.nitsuya.aa.display.databinding.FragmentAaMainBinding
 import io.github.nitsuya.aa.display.ui.aa.AaDisplayActivityKt
 import io.github.nitsuya.aa.display.util.AABroadcastConst
 import io.github.nitsuya.aa.display.util.AADisplayConfig
+import io.github.nitsuya.aa.display.util.SharedPreferencesAccess
 import io.github.nitsuya.aa.display.util.getGmsCarFirstPartyManager
 import io.github.nitsuya.aa.display.util.startCarAaDisplay
 import io.github.nitsuya.aa.display.util.startCarTelecom
@@ -27,10 +29,16 @@ import io.github.nitsuya.template.bases.runMain
 
 
 class AaMainFragment : BaseFragment<FragmentAaMainBinding>(FragmentAaMainBinding::class.java), TextureView.SurfaceTextureListener {
+    companion object {
+        private const val TAG = "AADisplay_AaMainFragment"
+    }
 
     private var displayId: Int = Display.INVALID_DISPLAY
     private var repairDownTime = Long.MIN_VALUE
     private var isForeground = false
+    private var isDisplayCreateRequested = false
+    private var isControlReceiverRegistered = false
+    private var displaySurface: Surface? = null
     private lateinit var config: SharedPreferences
 
     private var car:Car? = null
@@ -125,56 +133,11 @@ class AaMainFragment : BaseFragment<FragmentAaMainBinding>(FragmentAaMainBinding
     }
 
     override fun initViews() {
-        config = this.requireContext().getSharedPreferences(AADisplayConfig.ConfigName, MediaBrowserServiceCompat.MODE_WORLD_READABLE)
-        baseBinding.tvDisplay.post  {
-            CoreApi.onCreateDisplay(
-                baseBinding.tvDisplay.width,
-                baseBinding.tvDisplay.height,
-                AADisplayConfig.VirtualDisplayDpi.get(config).let {
-                    if(it <= 50) resources.displayMetrics.densityDpi
-                    else it
-                },
-                object : IVirtualDisplayCreatedListener.Stub() {
-                    @SuppressLint("ClickableViewAccessibility")
-                    override fun onAvailableDisplay(displayId: Int, create: Boolean) {
-                        this@AaMainFragment.displayId = displayId
-                        runMain {
-                            if (baseBinding.tvDisplay.isAvailable) {
-                                CoreApi.setDisplaySurface(Surface(baseBinding.tvDisplay.surfaceTexture))
-                            }
-                            baseBinding.tvDisplay.surfaceTextureListener = this@AaMainFragment
-                            baseBinding.tvDisplay.setOnTouchListener { _, e ->
-                                val uptimeMillis = SystemClock.uptimeMillis()
-                                if (e.action === MotionEvent.ACTION_DOWN) {
-                                    repairDownTime = uptimeMillis
-                                }
-                                val pointerCoords: Array<MotionEvent.PointerCoords?> = arrayOfNulls(e.pointerCount)
-                                val pointerProperties: Array<MotionEvent.PointerProperties?> = arrayOfNulls(e.pointerCount)
-                                for (i in 0 until e.pointerCount) {
-                                    pointerCoords[i] = MotionEvent.PointerCoords().apply {
-                                        e.getPointerCoords(i, this)
-                                    }
-                                    pointerProperties[i] = MotionEvent.PointerProperties().apply {
-                                        e.getPointerProperties(i, this)
-                                    }
-                                }
-                                //val newEvent = MotionEvent.obtain(repairDownTime, uptimeMillis, e.action, e.pointerCount, pointerProperties, pointerCoords, e.metaState, e.buttonState, e.xPrecision, e.yPrecision, e.deviceId, e.edgeFlags, e.source, e.flags)
-                                val newEvent = MotionEvent.obtain(repairDownTime, uptimeMillis, e.action, e.pointerCount, pointerProperties, pointerCoords,0,0,1.0f,1.0f,0,0,0,0)
-                                newEvent.source = InputDeviceCompat.SOURCE_TOUCHSCREEN
-                                CoreApi.touch(newEvent)
-                                newEvent.recycle()
-                                true
-                            }
-
-                            ContextCompat.registerReceiver(this@AaMainFragment.requireContext(), broadcastReceiver, IntentFilter().apply {
-                                addAction(AABroadcastConst.ACTION_SCREEN_CONTROL)
-                                addAction(AABroadcastConst.ACTION_STEERING_WHEEL_CONTROL)
-                            }, ContextCompat.RECEIVER_EXPORTED)
-
-                        }
-                    }
-                }
-            )
+        config = SharedPreferencesAccess.openForHooks(this.requireContext(), AADisplayConfig.ConfigName)
+        Log.i(TAG, "initViews")
+        baseBinding.tvDisplay.surfaceTextureListener = this
+        baseBinding.tvDisplay.doOnLayout {
+            requestDisplay("layout")
         }
 
         car?.disconnect()
@@ -186,6 +149,14 @@ class AaMainFragment : BaseFragment<FragmentAaMainBinding>(FragmentAaMainBinding
     override fun onResume() {
         super.onResume()
         isForeground = true
+        if (this::config.isInitialized) {
+            baseBinding.tvDisplay.post {
+                if (displayId == Display.INVALID_DISPLAY) {
+                    isDisplayCreateRequested = false
+                }
+                requestDisplay("resume")
+            }
+        }
     }
 
     override fun onPause() {
@@ -195,18 +166,133 @@ class AaMainFragment : BaseFragment<FragmentAaMainBinding>(FragmentAaMainBinding
 
     override fun onDestroy() {
         super.onDestroy()
+        Log.i(TAG, "onDestroy: displayId=$displayId")
+        clearDisplaySurface("destroy")
         CoreApi.onDestroyDisplay()
-        tryOrNull {
+        if (isControlReceiverRegistered) tryOrNull {
             this@AaMainFragment.requireContext().unregisterReceiver(broadcastReceiver)
+            isControlReceiverRegistered = false
         }
         car?.disconnect()
         car = null
     }
 
     override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
-        CoreApi.setDisplaySurface(Surface(surface))
+        Log.i(TAG, "onSurfaceTextureAvailable: ${width}x$height")
+        requestDisplay("surface-available")
     }
-    override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {}
-    override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean  = false
+    override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {
+        Log.i(TAG, "onSurfaceTextureSizeChanged: ${width}x$height")
+        requestDisplay("surface-size")
+    }
+    override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
+        Log.i(TAG, "onSurfaceTextureDestroyed")
+        clearDisplaySurface("surface-destroyed")
+        return true
+    }
     override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {}
+
+    private val displayCreatedListener = object : IVirtualDisplayCreatedListener.Stub() {
+        @SuppressLint("ClickableViewAccessibility")
+        override fun onAvailableDisplay(displayId: Int, create: Boolean) {
+            Log.i(TAG, "onAvailableDisplay: displayId=$displayId create=$create surfaceAvailable=${baseBinding.tvDisplay.isAvailable}")
+            this@AaMainFragment.displayId = displayId
+            runMain {
+                attachDisplaySurface("available")
+                setupTouchForwarding()
+                registerControlReceivers()
+            }
+        }
+    }
+
+    private fun requestDisplay(reason: String) {
+        if (!this::config.isInitialized) return
+
+        val displayWidth = baseBinding.tvDisplay.width
+        val displayHeight = baseBinding.tvDisplay.height
+        val displayDpi = AADisplayConfig.VirtualDisplayDpi.get(config).let {
+            if(it <= 50) resources.displayMetrics.densityDpi
+            else it
+        }
+        Log.i(TAG, "requestDisplay[$reason]: ${displayWidth}x$displayHeight,$displayDpi available=${baseBinding.tvDisplay.isAvailable} requested=$isDisplayCreateRequested display=$displayId")
+        if (displayWidth <= 0 || displayHeight <= 0) {
+            Log.e(TAG, "requestDisplay[$reason] skipped: invalid TextureView size ${displayWidth}x$displayHeight")
+            return
+        }
+
+        val texture = baseBinding.tvDisplay.surfaceTexture
+        if (!baseBinding.tvDisplay.isAvailable || texture == null) {
+            Log.i(TAG, "requestDisplay[$reason] waiting for TextureView surface")
+            return
+        }
+
+        val surface = getOrCreateDisplaySurface(texture)
+        if (isDisplayCreateRequested && displayId == Display.INVALID_DISPLAY) {
+            Log.i(TAG, "requestDisplay[$reason] skipped: create already pending")
+            return
+        }
+
+        isDisplayCreateRequested = true
+        CoreApi.onCreateDisplay(displayWidth, displayHeight, displayDpi, surface, displayCreatedListener)
+    }
+
+    private fun attachDisplaySurface(reason: String): Boolean {
+        val texture = baseBinding.tvDisplay.surfaceTexture
+        if (!baseBinding.tvDisplay.isAvailable || texture == null) {
+            Log.i(TAG, "attachDisplaySurface[$reason] skipped: TextureView surface unavailable")
+            return false
+        }
+        val surface = getOrCreateDisplaySurface(texture)
+        Log.i(TAG, "attachDisplaySurface[$reason]: display=$displayId surface=true")
+        CoreApi.setDisplaySurface(surface)
+        return true
+    }
+
+    private fun getOrCreateDisplaySurface(texture: SurfaceTexture): Surface {
+        return displaySurface ?: Surface(texture).also {
+            displaySurface = it
+            Log.i(TAG, "created display Surface")
+        }
+    }
+
+    private fun clearDisplaySurface(reason: String) {
+        Log.i(TAG, "clearDisplaySurface[$reason]: display=$displayId surface=${displaySurface != null}")
+        CoreApi.setDisplaySurface(null)
+        displaySurface?.release()
+        displaySurface = null
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setupTouchForwarding() {
+        baseBinding.tvDisplay.setOnTouchListener { _, e ->
+            val uptimeMillis = SystemClock.uptimeMillis()
+            if (e.action == MotionEvent.ACTION_DOWN) {
+                repairDownTime = uptimeMillis
+            }
+            val pointerCoords: Array<MotionEvent.PointerCoords?> = arrayOfNulls(e.pointerCount)
+            val pointerProperties: Array<MotionEvent.PointerProperties?> = arrayOfNulls(e.pointerCount)
+            for (i in 0 until e.pointerCount) {
+                pointerCoords[i] = MotionEvent.PointerCoords().apply {
+                    e.getPointerCoords(i, this)
+                }
+                pointerProperties[i] = MotionEvent.PointerProperties().apply {
+                    e.getPointerProperties(i, this)
+                }
+            }
+            val newEvent = MotionEvent.obtain(repairDownTime, uptimeMillis, e.action, e.pointerCount, pointerProperties, pointerCoords,0,0,1.0f,1.0f,0,0,0,0)
+            newEvent.source = InputDeviceCompat.SOURCE_TOUCHSCREEN
+            CoreApi.touch(newEvent)
+            newEvent.recycle()
+            true
+        }
+    }
+
+    private fun registerControlReceivers() {
+        if (isControlReceiverRegistered) return
+        ContextCompat.registerReceiver(this@AaMainFragment.requireContext(), broadcastReceiver, IntentFilter().apply {
+            addAction(AABroadcastConst.ACTION_SCREEN_CONTROL)
+            addAction(AABroadcastConst.ACTION_STEERING_WHEEL_CONTROL)
+        }, ContextCompat.RECEIVER_EXPORTED)
+        isControlReceiverRegistered = true
+    }
 }

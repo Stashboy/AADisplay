@@ -40,15 +40,18 @@ class CoreManagerService private constructor(): ICoreManager.Stub() {
 
         val config: XSharedPreferences? by lazy {
             XSharedPreferences(BuildConfig.APPLICATION_ID, AADisplayConfig.ConfigName).let { config ->
-                if(!config.file.canRead())
+                if(!config.file.canRead()) {
+                    log(TAG, "config unreadable: ${config.file}; using defaults")
                     null
-                else
+                } else {
                     config
+                }
             }
         }
 
         private var mDisplayWindow: DisplayWindow? = null
         private var mAaVirtualDisplayAdapter: AaVirtualDisplayAdapter? = null
+        private var mDisplayCreateInProgress = false
         private data class DisplayProfile(
             val width: Int,
             val height: Int,
@@ -200,8 +203,12 @@ class CoreManagerService private constructor(): ICoreManager.Stub() {
         return BuildConfig.BUILD_TIME
     }
 
-    override fun onCreateDisplay(width: Int, height: Int, densityDpi: Int, listener: IVirtualDisplayCreatedListener){
+    override fun onCreateDisplay(width: Int, height: Int, densityDpi: Int, surface: Surface?, listener: IVirtualDisplayCreatedListener){
         runMain {
+            log(
+                TAG,
+                "onCreateDisplay request: ${width}x$height,$densityDpi surface=${surface != null} existing=${mAaVirtualDisplayAdapter != null}"
+            )
             val profile = resolveDisplayProfile(
                 width = width,
                 height = height,
@@ -210,33 +217,47 @@ class CoreManagerService private constructor(): ICoreManager.Stub() {
             )
             mAaVirtualDisplayAdapter?.apply {
                 onReconnected(profile.width, profile.height, profile.densityDpi)
+                setSurface(surface)
                 mDisplayWindow?.onResume(profile.width, profile.height)
                 listener.onAvailableDisplay(this.mDisplayId, false)
+                return@runMain
+            }
+            if (mDisplayCreateInProgress) {
+                log(
+                    TAG,
+                    "onCreateDisplay ignored: display create already in progress for ${profile.width}x${profile.height},${profile.densityDpi}"
+                )
                 return@runMain
             }
             config?.apply {
                 reload()
                 log(TAG, "config: ${this.all.map { "${it.key}=${it.value}[${it.value?.javaClass?.name}]" }.joinToString() }")
             }
+            mDisplayCreateInProgress = true
             AaVirtualDisplayAdapter(systemContext, config){
-                mAaVirtualDisplayAdapter = this
-                onConnected(profile.width, profile.height, profile.densityDpi){ displayId ->
-                    listener.onAvailableDisplay(displayId, true)
+                try {
+                    mAaVirtualDisplayAdapter = this
+                    onConnected(profile.width, profile.height, profile.densityDpi, surface){ displayId ->
+                        listener.onAvailableDisplay(displayId, true)
+                    }
+                    mDisplayWindow?.onDestroyPromptly()
+                    mDisplayWindow = DisplayWindow(
+                        CommonContextWrapper.createAppCompatContext(systemContext),
+                        this,
+                        profile.width,
+                        profile.height,
+                        profile.densityDpi
+                    )
+                } finally {
+                    mDisplayCreateInProgress = false
                 }
-                mDisplayWindow?.onDestroyPromptly()
-                mDisplayWindow = DisplayWindow(
-                    CommonContextWrapper.createAppCompatContext(systemContext),
-                    this,
-                    profile.width,
-                    profile.height,
-                    profile.densityDpi
-                )
             }
         }
     }
 
     override fun setDisplaySurface(surface: Surface?){
         runMain {
+            log(TAG, "setDisplaySurface: surface=${surface != null}, display=${mAaVirtualDisplayAdapter?.mDisplayId ?: Display.INVALID_DISPLAY}")
             mAaVirtualDisplayAdapter?.setSurface(surface)
         }
     }
@@ -247,6 +268,7 @@ class CoreManagerService private constructor(): ICoreManager.Stub() {
                 mAaVirtualDisplayAdapter?.onDestroy()
                 mDisplayWindow = null
                 mAaVirtualDisplayAdapter = null
+                mDisplayCreateInProgress = false
                 clearDisplayProfileLock()
             }
         }

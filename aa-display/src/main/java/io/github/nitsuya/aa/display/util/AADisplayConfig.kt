@@ -12,8 +12,8 @@ sealed class AADisplayConfig<T>(val key: String) {
 
     abstract fun get(config: SharedPreferences?): T
 
-    object LauncherPackage: StringConfig("LauncherPackage", "com.autonavi.amapauto")
-    object HomePackage: StringConfig("HomePackage", "com.ss.squarehome2")
+    object LauncherPackage: StringConfig("LauncherPackage", null)
+    object HomePackage: StringConfig("HomePackage", null)
     object AutoOpen: BooleanConfig("AutoOpen", true)
     object DisableWazeOnAa: BooleanConfig("DisableWazeOnAa", false)
     object DisableGoogleMapsOnAa: BooleanConfig("DisableGoogleMapsOnAa", false)
@@ -34,7 +34,7 @@ sealed class AADisplayConfig<T>(val key: String) {
     abstract class StringConfig(key: String, private val defValue: String? = null): AADisplayConfig<String?>(key){
         override fun get(config: SharedPreferences?): String? = config?.getString(key, defValue)?.trim()?.let {
             it.ifBlank { defValue }
-        } ?: null
+        } ?: defValue
     }
     abstract class BooleanConfig(key: String, private val defValue: Boolean = false): AADisplayConfig<Boolean>(key){
         override fun get(config: SharedPreferences?): Boolean = config?.getBoolean(key, defValue) ?: defValue

@@ -1,6 +1,7 @@
 package io.github.nitsuya.aa.display.ui.aa;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
@@ -15,6 +16,7 @@ import io.github.nitsuya.aa.display.R;
 import io.github.nitsuya.aa.display.databinding.ActivityAaDisplayBinding;
 
 public class AaDisplayActivity extends CarActivity {
+    private static final String TAG = "AADisplay_AaActivity";
 
     private ActivityAaDisplayBinding mBinding;
 
@@ -25,6 +27,7 @@ public class AaDisplayActivity extends CarActivity {
     @Override
     public void onCreate(Bundle bundle) {
         super.onCreate(bundle);
+        Log.i(TAG, "onCreate");
         setIgnoreConfigChanges(0xFFFF);
         this.setTheme(R.style.Theme_AADisplay);
         this.mBinding = ActivityAaDisplayBinding.inflate(getLayoutInflater());
@@ -33,6 +36,30 @@ public class AaDisplayActivity extends CarActivity {
         this.getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
         this.getWindow().setFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED, WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED);
         AaDisplayActivityKt.INSTANCE.showMain(getSupportFragmentManager());
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        Log.i(TAG, "onStart");
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        Log.i(TAG, "onResume");
+    }
+
+    @Override
+    public void onPause() {
+        Log.i(TAG, "onPause");
+        super.onPause();
+    }
+
+    @Override
+    public void onStop() {
+        Log.i(TAG, "onStop");
+        super.onStop();
     }
 
     @Override
@@ -78,6 +105,7 @@ public class AaDisplayActivity extends CarActivity {
 
     @Override
     public void onDestroy() {
+        Log.i(TAG, "onDestroy");
         super.onDestroy();
     }
 

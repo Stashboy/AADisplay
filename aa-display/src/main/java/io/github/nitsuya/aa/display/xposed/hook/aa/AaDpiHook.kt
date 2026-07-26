@@ -80,7 +80,7 @@ object AaDpiHook : AaHook() {
         carDisplayConstructor.isAccessible = true
     }
 
-    override fun hook(config: SharedPreferences, lpparam: XC_LoadPackage.LoadPackageParam) {
+    override fun hook(config: SharedPreferences?, lpparam: XC_LoadPackage.LoadPackageParam) {
         AADisplayConfig.AndroidAutoDpi.get(config).also { androidAutoDpi ->
             if (androidAutoDpi < 50) return@also
             displayParamsConstructor.hookAfter { param -> log(tagName, param.thisObject.toString()) }

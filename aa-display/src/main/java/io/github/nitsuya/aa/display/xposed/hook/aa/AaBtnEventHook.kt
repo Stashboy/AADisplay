@@ -31,7 +31,7 @@ object AaBtnEventHook: AaHook() {
         return processProjection == processName
     }
 
-    override fun hook(config: SharedPreferences, lpparam: XC_LoadPackage.LoadPackageParam) {
+    override fun hook(config: SharedPreferences?, lpparam: XC_LoadPackage.LoadPackageParam) {
         val enableDefVoiceAssist = AADisplayConfig.VoiceAssistShell.get(config).isNullOrBlank()
         val isLoadHookReceive = Collections.synchronizedSet(HashSet<String>())
         val isDisposeHookReceive = Collections.synchronizedMap(HashMap<String, Any>())

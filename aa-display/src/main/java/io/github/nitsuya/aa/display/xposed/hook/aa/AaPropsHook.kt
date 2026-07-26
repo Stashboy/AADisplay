@@ -68,7 +68,7 @@ object AaPropsHook: AaHook() {
         }
     }
 
-    override fun hook(config: SharedPreferences, lpparam: XC_LoadPackage.LoadPackageParam) {
+    override fun hook(config: SharedPreferences?, lpparam: XC_LoadPackage.LoadPackageParam) {
         hookComGoogleAndroidProjectionGearheadProps(config)
         hookComGoogleAndroidGmsCarProps(config)
     }

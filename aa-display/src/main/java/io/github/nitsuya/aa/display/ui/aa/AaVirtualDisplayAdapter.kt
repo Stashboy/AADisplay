@@ -49,13 +49,20 @@ class AaVirtualDisplayAdapter(
             BuildConfig.APPLICATION_ID,
             "com.android.launcher3"
         )
+
+        private val BLOCKED_HOME_PACKAGES = setOf(
+            BuildConfig.APPLICATION_ID,
+            "android",
+            "com.android.internal.app",
+            "com.android.settings"
+        )
     }
 
     /** Default launch package name: the app package to launch when virtual display is created, can be null */
-    private var mLauncherPackage = AADisplayConfig.LauncherPackage.get(CoreManagerService.config)
+    private var mLauncherPackage: String? = null
 
     /** Home package for AADisplay task-view behavior, internally synced to launch package. */
-    private var mHomePackage = mLauncherPackage
+    private var mHomePackage: String? = null
     
     /** Task ID of the Home package */
     private var mHomeTaskId: Int? = null
@@ -78,6 +85,7 @@ class AaVirtualDisplayAdapter(
     private var mShellManager: IShellManager? = null
     private var mServiceConnection = object: ServiceConnection {
         override fun onServiceConnected(name: ComponentName, service: IBinder) {
+            log(TAG, "ShellManagerService connected: $name")
             mShellManager = IShellManager.Stub.asInterface(service)
             if(mDoInit) return
             mDoInit = !mDoInit
@@ -87,28 +95,37 @@ class AaVirtualDisplayAdapter(
             }
         }
         override fun onServiceDisconnected(name: ComponentName) {
+            log(TAG, "ShellManagerService disconnected: $name")
             mShellManager = null
         }
     }
 
     init {
-        CoreManagerService.systemContext.bindService(
+        refreshLauncherPackage("init")
+        val bound = CoreManagerService.systemContext.bindService(
             Intent(ShellManagerService::class.java.name).apply {
                 setPackage(BuildConfig.APPLICATION_ID)
             }
             , mServiceConnection
             , AppCompatActivity.BIND_AUTO_CREATE
         )
+        log(TAG, "bind ShellManagerService requested=$bound")
     }
 
     fun setSurface(surface: Surface?){
+        if (!::mVirtualDisplay.isInitialized) {
+            log(TAG, "setSurface ignored before virtual display init: surface=${surface != null}")
+            return
+        }
+        log(TAG, "setSurface: surface=${surface != null}, display=$mDisplayId")
         mVirtualDisplay.surface = surface
     }
 
     @SuppressLint("WrongConstant")
-    fun onConnected(width: Int, height: Int, densityDpi: Int, onVirtualDisplayCreated: ((Int) -> Unit)) {
+    fun onConnected(width: Int, height: Int, densityDpi: Int, surface: Surface?, onVirtualDisplayCreated: ((Int) -> Unit)) {
         mIsDestroying = false
         mTrackedPackageUsers.clear()
+        refreshLauncherPackage("connect")
         trackPackage(mLauncherPackage, 0)
         trackPackage(mHomePackage, 0)
         val indent = Binder.clearCallingIdentity()
@@ -118,7 +135,7 @@ class AaVirtualDisplayAdapter(
                 width,
                 height,
                 densityDpi,
-                null,
+                surface,
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC
                     or DisplayManager.VIRTUAL_DISPLAY_FLAG_SECURE
                     or DisplayManager.VIRTUAL_DISPLAY_FLAG_PRESENTATION
@@ -134,6 +151,7 @@ class AaVirtualDisplayAdapter(
         }
         mDisplayId = mVirtualDisplay.display.displayId
         mDensityDpi = densityDpi
+        log(TAG, "virtual display created: id=$mDisplayId, ${width}x$height,$densityDpi, surface=${surface != null}, launcher=${mLauncherPackage.orEmpty()}")
 
         try {
             Instances.iWindowManager.apply {
@@ -186,9 +204,7 @@ class AaVirtualDisplayAdapter(
     fun onReconnected(width: Int, height: Int, densityDpi: Int){
         mVirtualDisplay.resize(width, height, densityDpi)
         mDensityDpi = densityDpi
-        // Reload configuration
-        mLauncherPackage = AADisplayConfig.LauncherPackage.get(CoreManagerService.config)
-        mHomePackage = mLauncherPackage
+        refreshLauncherPackage("reconnect")
         trackPackage(mLauncherPackage, 0)
         trackPackage(mHomePackage, 0)
     }
@@ -359,7 +375,10 @@ class AaVirtualDisplayAdapter(
      * If the app is already running, bring it to front; otherwise start a new instance
      */
     private fun startHomeLauncher(){
-        if(mHomePackage == null) return
+        if(mHomePackage == null) {
+            log(TAG, "startHomeLauncher skipped: no launcher package")
+            return
+        }
         if(mHomeTaskId != null){
             moveTaskToFront(mHomeTaskId!!)
         } else {
@@ -372,7 +391,10 @@ class AaVirtualDisplayAdapter(
      * Called when virtual display is created. If the app is already running, bring it to front; otherwise start a new instance
      */
     private fun startDefaultPackage(){
-        if(mLauncherPackage == null) return
+        if(mLauncherPackage == null) {
+            log(TAG, "startDefaultPackage skipped: no launcher package")
+            return
+        }
         if(mLauncherPackageTaskId != null){
             moveTaskToFront(mLauncherPackageTaskId!!)
         } else {
@@ -383,13 +405,8 @@ class AaVirtualDisplayAdapter(
     fun startActivity(packageName: String, userId: Int): Boolean{
         try {
             if(mDisplayId == Display.INVALID_DISPLAY) return false
-            val componentName = if(packageName.contains("/")){
-                val packageComponent = packageName.split("/", limit = 2)
-                if(packageComponent.size != 2) return false
-                ComponentName.createRelative(packageComponent[0], packageComponent[1])
-            } else {
-                Instances.packageManager.getLaunchIntentForPackage(packageName)?.component ?: return false
-            }
+            val componentName = resolveLaunchComponent(packageName) ?: return false
+            log(TAG, "startActivity: $componentName on display=$mDisplayId user=$userId")
             context.invokeMethod(
                 "startActivityAsUser",
                 args(
@@ -417,6 +434,94 @@ class AaVirtualDisplayAdapter(
           log(TAG, "startActivity error:", e)
           return false
       }
+    }
+
+    private fun refreshLauncherPackage(reason: String) {
+        config?.reload()
+        val configured = AADisplayConfig.LauncherPackage.get(config)
+        val resolved = resolveLauncherPackage(configured)
+        if (mLauncherPackage != resolved) {
+            log(TAG, "launcher[$reason]: configured=${configured.orEmpty()}, resolved=${resolved.orEmpty()}")
+        }
+        mLauncherPackage = resolved
+        mHomePackage = resolved
+    }
+
+    private fun resolveLauncherPackage(configured: String?): String? {
+        val requested = configured?.trim()?.takeIf { it.isNotEmpty() }
+        if (requested != null && resolveLaunchComponent(requested) != null) {
+            return requested
+        }
+        if (requested != null) {
+            log(TAG, "configured launcher unavailable: $requested")
+        }
+
+        val defaultHome = resolveDefaultHomePackage()
+        val homeCandidates = queryHomeLauncherPackages()
+        val fallback = homeCandidates.firstOrNull { pkg -> pkg != defaultHome }
+
+        log(
+            TAG,
+            "launcher fallback: defaultHome=${defaultHome.orEmpty()}, candidates=${homeCandidates.joinToString()}, selected=${fallback.orEmpty()}"
+        )
+        return fallback
+    }
+
+    private fun resolveLaunchComponent(packageName: String): ComponentName? {
+        val requested = packageName.trim()
+        if (requested.isEmpty()) return null
+        return if (requested.contains("/")) {
+            val packageComponent = requested.split("/", limit = 2)
+            if (packageComponent.size != 2) return null
+            ComponentName.createRelative(packageComponent[0], packageComponent[1])
+        } else {
+            Instances.packageManager.getLaunchIntentForPackage(requested)?.component
+        }
+    }
+
+    private fun resolveDefaultHomePackage(): String? {
+        val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        val resolveInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.packageManager.resolveActivity(
+                homeIntent,
+                PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong())
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            context.packageManager.resolveActivity(homeIntent, PackageManager.MATCH_DEFAULT_ONLY)
+        } ?: return null
+
+        val pkg = resolveInfo.activityInfo?.packageName?.trim().orEmpty()
+        val cls = resolveInfo.activityInfo?.name?.trim().orEmpty()
+        return pkg.takeIf { isHomeCandidateAllowed(it, cls) }
+    }
+
+    private fun queryHomeLauncherPackages(): List<String> {
+        val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        val candidates = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.packageManager.queryIntentActivities(
+                homeIntent,
+                PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_ALL.toLong())
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            context.packageManager.queryIntentActivities(homeIntent, PackageManager.MATCH_ALL)
+        }
+
+        return candidates
+            .mapNotNull { resolveInfo ->
+                val pkg = resolveInfo.activityInfo?.packageName?.trim().orEmpty()
+                val cls = resolveInfo.activityInfo?.name?.trim().orEmpty()
+                pkg.takeIf { isHomeCandidateAllowed(it, cls) && resolveLaunchComponent(it) != null }
+            }
+            .distinct()
+    }
+
+    private fun isHomeCandidateAllowed(pkg: String, cls: String): Boolean {
+        if (pkg.isBlank() || BLOCKED_HOME_PACKAGES.contains(pkg)) return false
+        if (cls.contains("FallbackHome", ignoreCase = true)) return false
+        if (cls.contains("ResolverActivity", ignoreCase = true)) return false
+        return true
     }
 
     fun startTaskId(taskId: Int?, packageName: String, userId: Int): Boolean {

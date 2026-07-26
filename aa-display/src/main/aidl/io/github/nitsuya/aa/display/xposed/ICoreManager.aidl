@@ -12,7 +12,7 @@ interface ICoreManager {
     int getUid();
     long getBuildTime();
 
-    void onCreateDisplay(int with, int height, int densityDpi, IVirtualDisplayCreatedListener listener);
+    void onCreateDisplay(int with, int height, int densityDpi, in Surface surface, IVirtualDisplayCreatedListener listener);
     void setDisplaySurface(in Surface surface);
     void onDestroyDisplay();
 

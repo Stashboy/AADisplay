@@ -29,6 +29,7 @@ import io.github.nitsuya.aa.display.R
 import io.github.nitsuya.aa.display.databinding.ActivityMainBinding
 import io.github.nitsuya.aa.display.util.AADisplayConfig
 import io.github.nitsuya.aa.display.util.GoogleMapsOnAaManager
+import io.github.nitsuya.aa.display.util.SharedPreferencesAccess
 import io.github.nitsuya.aa.display.util.WazeOnAaManager
 import io.github.nitsuya.template.bases.getAttr
 
@@ -61,7 +62,7 @@ class MainActivity :
     )
 
     private val appConfig by lazy {
-        getSharedPreferences(AADisplayConfig.ConfigName, MODE_WORLD_READABLE)
+        SharedPreferencesAccess.openForHooks(this, AADisplayConfig.ConfigName)
     }
 
     private var launcherOptions: List<LauncherOption> = emptyList()
@@ -78,6 +79,7 @@ class MainActivity :
     override fun onCreate(savedInstanceState: Bundle?) {
         ActivityMainBinding.inflate(LayoutInflater.from(this))
         super.onCreate(savedInstanceState)
+        SharedPreferencesAccess.makeReadableForHooks(this, AADisplayConfig.ConfigName)
         addMenuProvider(this, this)
     }
 
@@ -517,14 +519,21 @@ class MainActivity :
             }
         }
 
-        appConfig.edit()
+        val settingsSaved = appConfig.edit()
             .putBoolean(AADisplayConfig.AutoOpen.key, baseBinding.switchAutoOpen.isChecked)
             .putBoolean(AADisplayConfig.DisableWazeOnAa.key, disableWazeOnAa)
             .putBoolean(AADisplayConfig.DisableGoogleMapsOnAa.key, disableGoogleMapsOnAa)
             .putString(AADisplayConfig.LauncherPackage.key, launcherPackage)
             .putString(AADisplayConfig.HomePackage.key, launcherPackage)
             .putString(AADisplayConfig.DelayDestroyTime.key, delay.toString())
-            .apply()
+            .commit()
+
+        val readableForHooks = SharedPreferencesAccess.makeReadableForHooks(this, AADisplayConfig.ConfigName)
+        if (!settingsSaved || !readableForHooks) {
+            Toast.makeText(this, getString(R.string.settings_saved_pref_access_failed), Toast.LENGTH_LONG).show()
+            updateSaveButtonState()
+            return
+        }
 
         savedAutoOpen = baseBinding.switchAutoOpen.isChecked
         savedDisableWazeOnAa = disableWazeOnAa

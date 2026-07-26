@@ -59,7 +59,7 @@ object AaSignatureHook: AaHook() {
             && parameterTypes[0] == String::class.java
         }
     }
-    override fun hook(config: SharedPreferences, lpparam: XC_LoadPackage.LoadPackageParam) {
+    override fun hook(config: SharedPreferences?, lpparam: XC_LoadPackage.LoadPackageParam) {
         method.hookAfter { param ->
             if((param.args[0] as String) == BuildConfig.APPLICATION_ID){
                 param.result = true

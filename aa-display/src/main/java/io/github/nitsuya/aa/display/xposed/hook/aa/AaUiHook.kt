@@ -109,7 +109,7 @@ object AaUiHook: AaHook() {
         }
     }
 
-    override fun hook(config: SharedPreferences, lpparam: XC_LoadPackage.LoadPackageParam) {
+    override fun hook(config: SharedPreferences?, lpparam: XC_LoadPackage.LoadPackageParam) {
         log(tagName,  "AaUiHook: ~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         hookBaseClick()
         if (canHookLayout) {
@@ -185,7 +185,7 @@ object AaUiHook: AaHook() {
         }
     }
 
-    private fun hookFacetBar(config: SharedPreferences) {
+    private fun hookFacetBar(config: SharedPreferences?) {
         val closeLauncherDashboard = AADisplayConfig.CloseLauncherDashboard.get(config)
         val autoOpen = AADisplayConfig.AutoOpen.get(config)
         findMethod(LayoutInflater::class.java) {
@@ -337,7 +337,7 @@ object AaUiHook: AaHook() {
         }
     }
 
-    private fun hookRadius(config: SharedPreferences) {
+    private fun hookRadius(config: SharedPreferences?) {
         if(!AADisplayConfig.ForceRightAngle.get(config)){
             return
         }

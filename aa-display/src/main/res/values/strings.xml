@@ -34,6 +34,7 @@
     <string name="delay_120_seconds">120 Seconds</string>
     <string name="delay_180_seconds">180 Seconds</string>
     <string name="settings_saved_successfully">Settings saved successfully</string>
+    <string name="settings_saved_pref_access_failed">Settings saved, but hook preference access could not be verified</string>
     <string name="controller_open_menu">Open controller menu</string>
     <string name="controller_hide_menu">Hide controller menu</string>
 </resources>
