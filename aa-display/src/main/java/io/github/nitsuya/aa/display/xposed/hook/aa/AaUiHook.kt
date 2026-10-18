@@ -1,8 +1,11 @@
 package io.github.nitsuya.aa.display.xposed.hook.aa
 
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.support.car.Car
+import android.support.car.CarConnectionCallback
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
@@ -11,14 +14,12 @@ import android.widget.ImageView
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
 import com.github.kyuubiran.ezxhelper.init.InitFields
-import com.github.kyuubiran.ezxhelper.utils.argTypes
 import com.github.kyuubiran.ezxhelper.utils.findMethod
 import com.github.kyuubiran.ezxhelper.utils.getIdByName
 import com.github.kyuubiran.ezxhelper.utils.getObjectOrNull
 import com.github.kyuubiran.ezxhelper.utils.hookAfter
 import com.github.kyuubiran.ezxhelper.utils.hookBefore
 import com.github.kyuubiran.ezxhelper.utils.loadClass
-import com.github.kyuubiran.ezxhelper.utils.staticMethod
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import de.robv.android.xposed.callbacks.XCallback
 import io.github.nitsuya.aa.display.BuildConfig
@@ -26,6 +27,8 @@ import io.github.nitsuya.aa.display.R
 import io.github.nitsuya.aa.display.service.AaActivityService
 import io.github.nitsuya.aa.display.util.AABroadcastConst
 import io.github.nitsuya.aa.display.util.AADisplayConfig
+import io.github.nitsuya.aa.display.util.getGmsCarFirstPartyManager
+import io.github.nitsuya.aa.display.util.startCarAaDisplay
 import io.github.nitsuya.aa.display.xposed.hook.AaHook
 import io.github.nitsuya.aa.display.xposed.hook.abortMethod
 import io.github.nitsuya.aa.display.xposed.log
@@ -35,13 +38,11 @@ import kotlinx.coroutines.delay
 import org.luckypray.dexkit.DexKitBridge
 import org.luckypray.dexkit.query.enums.StringMatchType
 import java.lang.reflect.Constructor
-import java.lang.reflect.Method
 
 object AaUiHook: AaHook() {
     override val tagName: String = "AAD_AaUiHook"
 
     private lateinit var layoutInfoConstructor: Constructor<*>
-    private var startMethod: Method? = null
 
     private var resLayoutLeftResourceId: Int = 0
     private var resLayoutRightResourceId: Int = 0
@@ -74,12 +75,6 @@ object AaUiHook: AaHook() {
             throw NoSuchMethodException("AaUiHook: not found LayoutInfo class：${classes.size}")
         }
         layoutInfoConstructor = resolveLayoutInfoConstructor(classes[0].name)
-
-        try{
-            startMethod = loadClass("com.google.android.projection.gearhead.service.CarSystemUiControllerService").staticMethod("a", null, argTypes(Intent::class.java))
-        } catch (e: Throwable){
-            log(tagName,  "AaUiHook: not found CarSystemUiControllerService.a static method", e)
-        }
 
         resLayoutGhFacetBarId = InitFields.appContext.resources.getIdentifier("gh_coolwalk_vertical_facet_bar", "layout", InitFields.appContext.packageName)
         resIdStatusBarId = getIdByName("status_bar")
@@ -135,6 +130,33 @@ object AaUiHook: AaHook() {
             if (param.args.size > 5 && param.args[5] is Boolean) {
                 param.args[5] = true //hasVerticalRail
             }
+        }
+    }
+
+    private fun autoOpenAaDisplay(context: Context) {
+        // AA 17.8 removed com.google.android.projection.gearhead.service.CarSystemUiControllerService,
+        // which the facet-bar auto-open previously used. Launch through the aauto-SDK first-party car
+        // client instead (the same proven path AaMainFragment uses), so auto-open is independent of
+        // obfuscated gearhead internals and survives future Android Auto renames. Fully guarded: any
+        // failure (incl. an unavailable manager) is a silent no-op and never disturbs the live display.
+        try {
+            val car = Car.createCar(context, object : CarConnectionCallback() {
+                override fun onConnected(connectedCar: Car) {
+                    try {
+                        connectedCar.getGmsCarFirstPartyManager().startCarAaDisplay()
+                        log(tagName, "autoOpen: startCarAaDisplay invoked")
+                    } catch (e: Throwable) {
+                        log(tagName, "autoOpen: startCarAaDisplay failed", e)
+                    } finally {
+                        runCatching { connectedCar.disconnect() }
+                    }
+                }
+
+                override fun onDisconnected(disconnectedCar: Car) {}
+            })
+            car.connect()
+        } catch (e: Throwable) {
+            log(tagName, "autoOpen: car connect failed", e)
         }
     }
 
@@ -217,14 +239,7 @@ object AaUiHook: AaHook() {
                 aaFacetBar.post {
                     runMain {
                         delay(1000)
-                        try{
-                            startMethod?.invoke(null, Intent().apply {
-                                component = ComponentName(BuildConfig.APPLICATION_ID, AaActivityService::class.java.name)
-                                putExtra("android.intent.extra.PACKAGE_NAME", BuildConfig.APPLICATION_ID)
-                            })
-                        } catch (e: Throwable) {
-                            log(tagName, "CarSystemUiControllerService.a start app error", e)
-                        }
+                        autoOpenAaDisplay(ctx)
                     }
                 }
             }

@@ -1,5 +1,100 @@
 # Changelog
 
+## 0.23.11 (2026-10-18)
+
+### Changed
+- Version updated to `versionName` `0.23#17.8-r3`, `versionCode` `3018`.
+- Android Auto compatibility baseline updated to `17.8.663884-release`.
+- Restored the AADisplay auto-open launcher for Android Auto 17.8, which removed
+  `com.google.android.projection.gearhead.service.CarSystemUiControllerService`. Auto-open now
+  launches via the first-party car SDK (`CarFirstPartyManager.startCarActivity`) instead of the
+  obfuscated gearhead-internal class, removing the version-fragile dependency. Fully guarded.
+- `AutoOpen` now defaults to off (opt-in); it no longer auto-opens on unreadable preferences.
+- Added adaptive virtual-display DPI: when `VirtualDisplayDpi` is auto (0), density is set to the
+  highest value keeping smallestWidthDp >= 600 (`shortSidePx * 160 / 600`), so mirrored apps use the
+  large-screen layout and do not force-lock fullscreen (fixes YouTube opening/locking in fullscreen).
+  Auto-tunes per head unit (720x480->128, 1920x720->192, 1920x1080->288); a manual value overrides.
+- Removed `VIRTUAL_DISPLAY_FLAG_PRESENTATION` from the mirror virtual display.
+- Rolls up the previously-unpublished 17.3 -> 17.6 candidates (v0.23.7 - v0.23.10), including removal
+  of the Google Maps-on-Android-Auto toggle. Independent Waze control unchanged.
+
+### Verification
+- Clean release build `0.23#17.8-r3` (`versionCode` `3018`) installed in place; installed APK matched the built artifact.
+- YouTube fullscreen-lock confirmed fixed on a connected Desktop Head Unit after the DPI change (2nd display density 128, smallestWidthDp 600, video exitable); the adaptive path reproduces this automatically.
+- Android Auto 17.8 offset check: 8/9 hook fingerprint groups resolve unchanged; the only drift (auto-open launcher class) is addressed above.
+- Full live in-vehicle head-unit validation still recommended.
+
+## 0.23.10 (2026-09-20)
+
+### Changed
+- Compatibility candidate version updated to:
+  - `versionName`: `0.23#17.6-r1`
+  - `versionCode`: `3015`
+- Android Auto compatibility baseline updated from `17.5.663214-release` to `17.6.663454-release`.
+- No hook name, constructor shape, argument index, or resource-name change was made. Runtime evidence and direct APK comparison proved that the existing semantic and resource-name resolvers already follow the Android Auto 17.6 obfuscation changes.
+
+### Verification
+- Confirmed the Play-installed Android Auto `17.6.663454-release` package and all four base/split hashes before and after reboot.
+- Confirmed the existing AADisplay build completed resolver loading in the active Android Auto projection, shared, and car processes without an AADisplay-tagged resolver failure or AndroidRuntime fatal exception.
+- Compared the Android Auto 17.5 and 17.6 DEX/resource contracts used by AADisplay and verified that constructor semantics, argument positions, the fixed launcher method, button-action contracts, required resource names, and target layout structures remain compatible.
+- Clean-built and in-place installed the release candidate, rebooted, verified that the installed APK matched the built artifact, and confirmed the app/module version handshake reports `0.23#17.6-r1`.
+- Repeated the Android Auto projection, shared, and car resolver capture from the installed build with no AADisplay-tagged failure or AndroidRuntime fatal exception.
+- Live head-unit validation remains required before promoting this candidate as production-verified.
+
+## 0.23.9 (2026-09-07)
+
+### Changed
+- Compatibility candidate version updated to:
+  - `versionName`: `0.23#17.5-r1`
+  - `versionCode`: `3014`
+- Android Auto compatibility baseline updated from `17.4.663054-release` to `17.5.663214-release`.
+- Removed the Google Maps-on-Android-Auto toggle, its persisted config option, UI strings/layout, component manager, and all active Google Maps package/component/global-setting manipulation. The independent Waze control remains unchanged.
+- No hook name, constructor shape, argument index, or resource-name change was made. Post-reboot runtime evidence and direct APK comparison proved that the existing semantic and resource-name resolvers already follow the Android Auto 17.5 obfuscation changes.
+
+### Verification
+- Confirmed the Play-installed Android Auto `17.5.663214-release` package and its base/split hashes before and after reboot.
+- Confirmed the AADisplay hook resolver chain completed in the active Android Auto projection, shared, car, and provider processes without an AADisplay-tagged resolver failure or fatal exception.
+- Compared the Android Auto 17.4 and 17.5 DEX/resource contracts used by AADisplay and verified that constructor semantics, argument positions, the fixed launcher method, button-action contracts, and required resource names remain compatible.
+- Reset all five legacy Google Maps component overrides to their manifest-default state and removed the legacy AADisplay global setting from the test device.
+- Clean-built and in-place installed the release candidate, rebooted, verified that the installed APK matched the built artifact, and confirmed the app/module version handshake reports `0.23#17.5-r1`.
+- Repeated the Android Auto projection, shared, and car resolver capture from the installed build with no AADisplay-tagged failure or AndroidRuntime fatal exception.
+- Confirmed after reboot that the Google Maps setting is absent from the live AADisplay UI and that the legacy global setting and component overrides remain removed.
+- Live head-unit validation remains required before promoting this candidate as production-verified.
+
+## 0.23.8 (2026-08-29)
+
+### Changed
+- Compatibility candidate version updated to:
+  - `versionName`: `0.23#17.4-r1`
+  - `versionCode`: `3013`
+- Android Auto compatibility baseline updated from `17.3.662854-release` to `17.4.663054-release`.
+- No hook name, constructor shape, argument index, or resource-name change was made. Post-reboot runtime evidence and direct APK comparison proved that the existing semantic and resource-name resolvers already follow the Android Auto 17.4 obfuscation and numeric resource-ID changes.
+
+### Verification
+- Confirmed the Play-installed Android Auto `17.4.663054-release` package after reboot.
+- Confirmed the AADisplay hook resolver chain completed in the active Android Auto projection, shared, and car processes without an AADisplay-tagged resolver failure or fatal exception.
+- Compared the Android Auto 17.3 and 17.4 DEX/resource contracts used by AADisplay and verified that constructor semantics, argument positions, the fixed launcher method, button-action contracts, and required resource names remain compatible.
+- Clean-built and in-place installed the release candidate, rebooted, verified that the installed APK matched the built artifact, and confirmed the app/module version handshake reports `0.23#17.4-r1`.
+- Repeated the Android Auto projection, shared, and car resolver capture from the installed build with no AADisplay-tagged failure or AndroidRuntime fatal exception.
+- Live head-unit validation remains required before promoting this candidate as production-verified.
+
+## 0.23.7 (2026-08-14)
+
+### Changed
+- Compatibility candidate version updated to:
+  - `versionName`: `0.23#17.3-r1`
+  - `versionCode`: `3012`
+- Android Auto compatibility baseline updated from `17.2.662634-release` to `17.3.662854-release`.
+- No hook name, constructor shape, argument index, or resource-name change was made. Runtime resolver evidence and direct APK comparison proved that the existing semantic resolvers already follow the Android Auto 17.3 obfuscation changes.
+
+### Verification
+- Updated Android Auto through Google Play and confirmed the installed `17.3.662854-release` package after reboot.
+- Confirmed the AADisplay hook resolver chain completed in the active Android Auto projection, shared, and car processes without an AADisplay-tagged resolver failure or fatal exception.
+- Compared the Android Auto 17.2 and 17.3 DEX/resource contracts used by AADisplay and verified that constructor semantics, argument positions, the fixed launcher method, and required resource names remain compatible.
+- Clean-built and in-place installed the release candidate, rebooted, verified that the installed APK matched the built artifact, and confirmed the app/module version handshake reports `0.23#17.3-r1`.
+- Repeated the Android Auto projection, shared, and car resolver capture from the corrected installed build with no AADisplay-tagged failure or AndroidRuntime fatal exception.
+- Live head-unit validation remains required before promoting this candidate as production-verified.
+
 ## 0.23.6 (2026-07-26)
 
 ### Changed

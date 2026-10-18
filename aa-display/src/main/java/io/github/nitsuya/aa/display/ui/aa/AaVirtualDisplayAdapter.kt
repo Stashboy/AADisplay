@@ -138,7 +138,11 @@ class AaVirtualDisplayAdapter(
                 surface,
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC
                     or DisplayManager.VIRTUAL_DISPLAY_FLAG_SECURE
-                    or DisplayManager.VIRTUAL_DISPLAY_FLAG_PRESENTATION
+                    // Disabled 2026-10-17: FLAG_PRESENTATION makes media apps (e.g. YouTube) treat
+                    // this as a cast/secondary presentation screen, auto-entering fullscreen and
+                    // suppressing the in-video minimize/exit controls. Removing it restores normal
+                    // on-display app behavior. Re-enable (uncomment) if the AA display regresses.
+                    //or DisplayManager.VIRTUAL_DISPLAY_FLAG_PRESENTATION
                     or DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY
                     //or (1 shl 8) //DisplayManager.VIRTUAL_DISPLAY_FLAG_DESTROY_CONTENT_ON_REMOVAL
                     or (1 shl 10) //DisplayManager.VIRTUAL_DISPLAY_FLAG_TRUSTED

@@ -205,14 +205,33 @@ class AaMainFragment : BaseFragment<FragmentAaMainBinding>(FragmentAaMainBinding
         }
     }
 
+    /**
+     * Auto virtual-display density, used when VirtualDisplayDpi is unset (0/<=50).
+     *
+     * Picks the HIGHEST density that still keeps smallestWidthDp >= 600, i.e. the large-screen
+     * (sw600) layout bucket. Apps mirrored onto the display (notably YouTube) then use their
+     * tablet/two-pane layout and do NOT force-lock landscape video fullscreen, so the user can
+     * exit a video. Targeting the max dpi (not a smaller one) keeps the UI as large/sharp as
+     * possible, so higher-resolution head units get the better result automatically:
+     *   720x480  (DHU)        -> short 480  -> 128 dpi (sw600)
+     *   1920x720 (Kia ccNC)   -> short 720  -> 192 dpi (sw600, full resolution, no shrink)
+     *   1920x1080             -> short 1080 -> 288 dpi (sw600)
+     * Integer division floors, so smallestWidthDp is always >= 600.
+     */
+    private fun adaptiveDisplayDpi(width: Int, height: Int): Int {
+        val shortSide = minOf(width, height)
+        if (shortSide <= 0) return resources.displayMetrics.densityDpi
+        return (shortSide * 160 / 600).coerceAtLeast(1)
+    }
+
     private fun requestDisplay(reason: String) {
         if (!this::config.isInitialized) return
 
         val displayWidth = baseBinding.tvDisplay.width
         val displayHeight = baseBinding.tvDisplay.height
-        val displayDpi = AADisplayConfig.VirtualDisplayDpi.get(config).let {
-            if(it <= 50) resources.displayMetrics.densityDpi
-            else it
+        val displayDpi = AADisplayConfig.VirtualDisplayDpi.get(config).let { configured ->
+            if (configured > 50) configured
+            else adaptiveDisplayDpi(displayWidth, displayHeight)
         }
         Log.i(TAG, "requestDisplay[$reason]: ${displayWidth}x$displayHeight,$displayDpi available=${baseBinding.tvDisplay.isAvailable} requested=$isDisplayCreateRequested display=$displayId")
         if (displayWidth <= 0 || displayHeight <= 0) {
