@@ -11,8 +11,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
-import androidx.constraintlayout.widget.ConstraintLayout
-import androidx.constraintlayout.widget.ConstraintSet
 import com.github.kyuubiran.ezxhelper.init.InitFields
 import com.github.kyuubiran.ezxhelper.utils.findMethod
 import com.github.kyuubiran.ezxhelper.utils.getIdByName
@@ -51,6 +49,7 @@ object AaUiHook: AaHook() {
     private var resIdStatusBarId: Int = 0
     private var resIdLauncherAndDashboardIconContainerId: Int = 0
     private var resIdLauncherAndDashboardIconId: Int = 0
+    private var resIdAssistantIconContainerId: Int = 0
     private var canHookLayout: Boolean = false
     private var canHookFacetBar: Boolean = false
 
@@ -80,6 +79,7 @@ object AaUiHook: AaHook() {
         resIdStatusBarId = getIdByName("status_bar")
         resIdLauncherAndDashboardIconContainerId = getIdByName("launcher_and_dashboard_icon_container")
         resIdLauncherAndDashboardIconId = getIdByName("launcher_and_dashboard_icon")
+        resIdAssistantIconContainerId = getIdByName("assistant_icon_container")
 
         resLayoutLeftResourceId = InitFields.appContext.resources.getIdentifier("sys_ui_layout_canonical_vertical_rail_lhd", "layout", InitFields.appContext.packageName)
         resLayoutRightResourceId = InitFields.appContext.resources.getIdentifier("sys_ui_layout_canonical_vertical_rail_rhd", "layout", InitFields.appContext.packageName)
@@ -91,15 +91,16 @@ object AaUiHook: AaHook() {
                 "AaUiHook: skip layout override, missing canonical layout resources: lhd=$resLayoutLeftResourceId, rhd=$resLayoutRightResourceId"
             )
         }
+        // Surgical mic->Home swap only needs the facet-bar layout + the assistant (mic) container.
+        // The launcher icon is used by the optional closeLauncherDashboard behavior; it is not
+        // required for the swap, so it is not part of the gate.
         canHookFacetBar =
             resLayoutGhFacetBarId != 0 &&
-            resIdStatusBarId != 0 &&
-            resIdLauncherAndDashboardIconContainerId != 0 &&
-            resIdLauncherAndDashboardIconId != 0
+            resIdAssistantIconContainerId != 0
         if (!canHookFacetBar) {
             log(
                 tagName,
-                "AaUiHook: skip facet-bar override, missing resources: facet=$resLayoutGhFacetBarId, status=$resIdStatusBarId, launcherContainer=$resIdLauncherAndDashboardIconContainerId, launcherIcon=$resIdLauncherAndDashboardIconId"
+                "AaUiHook: skip facet-bar override, missing resources: facet=$resLayoutGhFacetBarId, assistantContainer=$resIdAssistantIconContainerId, status=$resIdStatusBarId, launcherContainer=$resIdLauncherAndDashboardIconContainerId, launcherIcon=$resIdLauncherAndDashboardIconId"
             )
         }
     }
@@ -220,98 +221,68 @@ object AaUiHook: AaHook() {
             if (param.args[0] as Int != resLayoutGhFacetBarId) {
                 return@hookAfter
             }
-            val resultViewGroup = param.result as ViewGroup? ?: return@hookAfter //androidx.constraintlayout.widget.ConstraintLayout
+            val facetBar = param.result as ViewGroup? ?: return@hookAfter //androidx.constraintlayout.widget.ConstraintLayout
             val ctx = (param.thisObject as LayoutInflater).context
-            val ctx2 = CommonContextWrapper.createAppCompatContext(ctx)
-            val layoutInflater = LayoutInflater.from(ctx2)
-            val resultViewGroupParent = (resultViewGroup.parent as ViewGroup?)?.apply {
-                removeView(resultViewGroup)
-            }
-            if(closeLauncherDashboard){
-                resultViewGroup.findViewById<View>(resIdLauncherAndDashboardIconId).apply {
-                    setOnClickFinallyListener {
-                        performLongClick()
+            // Surgical swap: keep Android Auto's NATIVE facet bar exactly as inflated (recents,
+            // AA's own Home, the hotseat app icons, status bar). Replace ONLY the assistant (mic)
+            // slot with the AADisplay Home button. Back + Fullscreen stay on the phone-side
+            // DisplayWindow controls (left untouched). param.result is returned unchanged so the
+            // native layout/constraints are preserved.
+            try {
+                if (closeLauncherDashboard && resIdLauncherAndDashboardIconId != 0) {
+                    facetBar.findViewById<View>(resIdLauncherAndDashboardIconId)?.apply {
+                        setOnClickFinallyListener {
+                            performLongClick()
+                        }
                     }
                 }
-            }
-            val aaFacetBar = layoutInflater.inflate(R.layout.aa_facet_bar, resultViewGroupParent, false) as ConstraintLayout
-            if(autoOpen){
-                aaFacetBar.post {
-                    runMain {
-                        delay(1000)
-                        autoOpenAaDisplay(ctx)
+                val assistantContainer = facetBar.findViewById<ViewGroup>(resIdAssistantIconContainerId)
+                if (assistantContainer != null) {
+                    // COVER, don't fight. AA re-shows the mic after inflate, so instead of toggling
+                    // its visibility (a race that either loses or needs a frame-flooding listener),
+                    // overlay ONE opaque Home button on top and never touch the bar again:
+                    //  - built with CommonContextWrapper so the module drawable (reserved package id
+                    //    0x64) resolves in the gearhead process instead of rendering blank;
+                    //  - opaque background matching the black rail => the mic underneath is fully
+                    //    hidden regardless of what AA does with it;
+                    //  - translationZ keeps it top-most for both drawing and touch, no listener.
+                    // Result: zero ongoing render cost (nothing re-runs per frame).
+                    val moduleCtx = CommonContextWrapper.createAppCompatContext(ctx)
+                    val homeBtn = ImageView(moduleCtx).apply {
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                        scaleType = ImageView.ScaleType.CENTER_INSIDE
+                        setImageResource(R.drawable.ic_aa_home_44)
+                        setPadding(0, 5, 0, 5)
+                        setBackgroundColor(android.graphics.Color.BLACK)
+                        isClickable = true
+                        isFocusable = true
+                        translationZ = 100f
+                        setOnClickListener {
+                            ctx.sendBroadcast(Intent().apply {
+                                action = AABroadcastConst.ACTION_SCREEN_CONTROL
+                                putExtra(AABroadcastConst.EXTRA_ACTION, KeyEvent.KEYCODE_HOME)
+                            })
+                        }
+                    }
+                    assistantContainer.addView(homeBtn)
+                    homeBtn.bringToFront()
+                } else {
+                    log(tagName, "AaUiHook: assistant_icon_container not found at runtime; mic not replaced")
+                }
+                if (autoOpen) {
+                    facetBar.post {
+                        runMain {
+                            delay(1000)
+                            autoOpenAaDisplay(ctx)
+                        }
                     }
                 }
+            } catch (e: Throwable) {
+                log(tagName, "AaUiHook: facet-bar mic->Home swap failed", e)
             }
-            val createBtn: (resId: Int, block: View.() -> Unit) -> Int = { resId, block ->
-                val btn = ImageView(ctx).apply {
-                    id = View.generateViewId()
-                    layoutParams = ConstraintLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-                    setImageResource(resId)
-                }
-                block(btn)
-                aaFacetBar.addView(btn)
-                btn.id
-            }
-            val topIds = arrayListOf(
-                resIdStatusBarId,
-                resIdLauncherAndDashboardIconContainerId
-            )
-            val bottomIds = arrayListOf(
-                createBtn(R.drawable.ic_aa_home_44){
-                    val intentClick = Intent().apply {
-                        action = AABroadcastConst.ACTION_SCREEN_CONTROL
-                        putExtra(AABroadcastConst.EXTRA_ACTION, KeyEvent.KEYCODE_HOME)
-                    }
-                    setOnClickListener {
-                        ctx.sendBroadcast(intentClick)
-                    }
-                    setPadding(0, 5, 0, 5)
-                },
-                createBtn(R.drawable.ic_aa_fullscreen_44){
-                    val intentClick = Intent().apply {
-                        action = AABroadcastConst.ACTION_SCREEN_CONTROL
-                        putExtra(AABroadcastConst.EXTRA_ACTION, KeyEvent.KEYCODE_APP_SWITCH)
-                    }
-                    setOnClickListener {
-                        ctx.sendBroadcast(intentClick)
-                    }
-                    setPadding(0, 5, 0, 5)
-                },
-                createBtn(R.drawable.ic_aa_arrow_back_44){
-                    val intentClick = Intent().apply {
-                        action = AABroadcastConst.ACTION_SCREEN_CONTROL
-                        putExtra(AABroadcastConst.EXTRA_ACTION, KeyEvent.KEYCODE_BACK)
-                    }
-                    setOnClickListener {
-                        ctx.sendBroadcast(intentClick)
-                    }
-                    setPadding(0, 5, 0, 5)
-                },
-            )
-            arrayListOf(resIdStatusBarId, resIdLauncherAndDashboardIconContainerId).forEach { vId ->
-                val view = resultViewGroup.findViewById<View>(vId)
-                (view.parent as ViewGroup?)?.apply {
-                    removeView(view)
-                }
-                aaFacetBar.addView(view)
-            }
-            val set = ConstraintSet()
-            set.clone(aaFacetBar)
-            bottomIds.forEachIndexed { index, vId ->
-                set.connect(vId, ConstraintSet.BOTTOM, if(index == 0) ConstraintSet.PARENT_ID else bottomIds[index-1], if(index == 0) ConstraintSet.BOTTOM else ConstraintSet.TOP, 0)
-                set.connect(vId, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END, 0)
-                set.connect(vId, ConstraintSet.START, ConstraintSet.PARENT_ID, ConstraintSet.START, 0)
-            }
-            topIds.forEachIndexed { index, vId ->
-                set.connect(vId, ConstraintSet.TOP, if(index == 0) ConstraintSet.PARENT_ID else topIds[index-1], if(index == 0) ConstraintSet.TOP else ConstraintSet.BOTTOM, 0)
-                set.connect(vId, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END, 0)
-                set.connect(vId, ConstraintSet.START, ConstraintSet.PARENT_ID, ConstraintSet.START, 0)
-            }
-            set.applyTo(aaFacetBar)
-            resultViewGroup.visibility = View.GONE
-            aaFacetBar.addView(resultViewGroup)
-            param.result = aaFacetBar
         }
     }
 
