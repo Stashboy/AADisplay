@@ -29,7 +29,6 @@ import io.github.nitsuya.aa.display.R
 import io.github.nitsuya.aa.display.databinding.ActivityMainBinding
 import io.github.nitsuya.aa.display.util.AADisplayConfig
 import io.github.nitsuya.aa.display.util.SharedPreferencesAccess
-import io.github.nitsuya.aa.display.util.WazeOnAaManager
 import io.github.nitsuya.template.bases.getAttr
 
 class MainActivity :
@@ -72,7 +71,6 @@ class MainActivity :
     private var savedLauncherPackage: String? = null
     private var savedDelayDestroyTime: Int = 180
     private var savedAutoOpen: Boolean = false
-    private var savedDisableWazeOnAa: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         ActivityMainBinding.inflate(LayoutInflater.from(this))
@@ -166,10 +164,6 @@ class MainActivity :
             updateSaveButtonState()
         }
 
-        baseBinding.switchDisableWazeOnAa.setOnCheckedChangeListener { _, _ ->
-            updateSaveButtonState()
-        }
-
         baseBinding.actvLauncherPackage.apply {
             inputType = InputType.TYPE_NULL
             keyListener = null
@@ -227,11 +221,9 @@ class MainActivity :
 
     private fun refreshSettingControls() {
         savedAutoOpen = AADisplayConfig.AutoOpen.get(appConfig)
-        savedDisableWazeOnAa = AADisplayConfig.DisableWazeOnAa.get(appConfig)
         savedLauncherPackage = AADisplayConfig.LauncherPackage.get(appConfig)?.trim().orEmpty()
         savedDelayDestroyTime = AADisplayConfig.DelayDestroyTime.get(appConfig)
         baseBinding.switchAutoOpen.isChecked = savedAutoOpen
-        baseBinding.switchDisableWazeOnAa.isChecked = savedDisableWazeOnAa
 
         detectLauncherEnvironment()
         bindLauncherDropdown()
@@ -490,19 +482,8 @@ class MainActivity :
 
         val launcherPackage = resolveSelectedLauncherPackage() ?: return
         val delay = resolveSelectedDelaySeconds() ?: return
-        val disableWazeOnAa = baseBinding.switchDisableWazeOnAa.isChecked
-        if (disableWazeOnAa != savedDisableWazeOnAa) {
-            val applied = WazeOnAaManager.apply(disableWazeOnAa)
-            if (!applied) {
-                Toast.makeText(this, getString(R.string.disable_waze_on_aa_apply_failed), Toast.LENGTH_SHORT).show()
-                baseBinding.switchDisableWazeOnAa.isChecked = savedDisableWazeOnAa
-                updateSaveButtonState()
-                return
-            }
-        }
         val settingsSaved = appConfig.edit()
             .putBoolean(AADisplayConfig.AutoOpen.key, baseBinding.switchAutoOpen.isChecked)
-            .putBoolean(AADisplayConfig.DisableWazeOnAa.key, disableWazeOnAa)
             .putString(AADisplayConfig.LauncherPackage.key, launcherPackage)
             .putString(AADisplayConfig.HomePackage.key, launcherPackage)
             .putString(AADisplayConfig.DelayDestroyTime.key, delay.toString())
@@ -516,7 +497,6 @@ class MainActivity :
         }
 
         savedAutoOpen = baseBinding.switchAutoOpen.isChecked
-        savedDisableWazeOnAa = disableWazeOnAa
         savedLauncherPackage = launcherPackage
         savedDelayDestroyTime = delay
         Toast.makeText(this, getString(R.string.settings_saved_successfully), Toast.LENGTH_SHORT).show()
@@ -534,11 +514,9 @@ class MainActivity :
 
     private fun hasPendingChanges(): Boolean {
         val currentAutoOpen = baseBinding.switchAutoOpen.isChecked
-        val currentDisableWazeOnAa = baseBinding.switchDisableWazeOnAa.isChecked
         val currentLauncher = resolveSelectedLauncherPackage()
         val currentDelay = resolveSelectedDelaySeconds()
         return currentAutoOpen != savedAutoOpen ||
-            currentDisableWazeOnAa != savedDisableWazeOnAa ||
             currentLauncher != savedLauncherPackage ||
             currentDelay != savedDelayDestroyTime
     }

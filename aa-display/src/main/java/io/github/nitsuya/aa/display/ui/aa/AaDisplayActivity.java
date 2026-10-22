@@ -18,6 +18,43 @@ import io.github.nitsuya.aa.display.databinding.ActivityAaDisplayBinding;
 public class AaDisplayActivity extends CarActivity {
     private static final String TAG = "AADisplay_AaActivity";
 
+    // Current live instance, so the AA-side session can be dismissed from elsewhere (e.g. when the
+    // virtual display is torn down by the phone-side kill switch). CarActivity has no finish(),
+    // so goHome() uses back navigation, which returns to the Android Auto launcher.
+    public static AaDisplayActivity current = null;
+
+    public void goHome() {
+        // Return Android Auto to its native launcher by finishing this car activity. CarActivity
+        // exposes no finish(); the actual finish lives on the host (com.google.android.gms.car.c's
+        // private CarActivityHost field, which gearhead backs). Locate it by TYPE (not name) so R8
+        // obfuscation of the field/class name cannot break it, then call CarActivityHost.finish().
+        try {
+            com.google.android.gms.car.CarActivityHost host = null;
+            Class<?> cls = getClass();
+            while (cls != null && host == null) {
+                for (java.lang.reflect.Field f : cls.getDeclaredFields()) {
+                    if (com.google.android.gms.car.CarActivityHost.class.isAssignableFrom(f.getType())) {
+                        f.setAccessible(true);
+                        Object value = f.get(this);
+                        if (value instanceof com.google.android.gms.car.CarActivityHost) {
+                            host = (com.google.android.gms.car.CarActivityHost) value;
+                            break;
+                        }
+                    }
+                }
+                cls = cls.getSuperclass();
+            }
+            if (host != null) {
+                Log.i(TAG, "goHome: finishing car activity via CarActivityHost -> AA launcher");
+                host.finish();
+            } else {
+                Log.e(TAG, "goHome: CarActivityHost not found; cannot return to AA home");
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "goHome failed", t);
+        }
+    }
+
     private ActivityAaDisplayBinding mBinding;
 
     protected Window getWindow() {
@@ -28,6 +65,7 @@ public class AaDisplayActivity extends CarActivity {
     public void onCreate(Bundle bundle) {
         super.onCreate(bundle);
         Log.i(TAG, "onCreate");
+        current = this;
         setIgnoreConfigChanges(0xFFFF);
         this.setTheme(R.style.Theme_AADisplay);
         this.mBinding = ActivityAaDisplayBinding.inflate(getLayoutInflater());
@@ -106,6 +144,7 @@ public class AaDisplayActivity extends CarActivity {
     @Override
     public void onDestroy() {
         Log.i(TAG, "onDestroy");
+        if (current == this) current = null;
         super.onDestroy();
     }
 

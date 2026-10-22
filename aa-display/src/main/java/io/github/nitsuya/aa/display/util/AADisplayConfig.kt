@@ -15,7 +15,6 @@ sealed class AADisplayConfig<T>(val key: String) {
     object LauncherPackage: StringConfig("LauncherPackage", null)
     object HomePackage: StringConfig("HomePackage", null)
     object AutoOpen: BooleanConfig("AutoOpen", false)
-    object DisableWazeOnAa: BooleanConfig("DisableWazeOnAa", false)
     object VirtualDisplayDpi: IntConfig("VirtualDisplayDpi", 0)
     object AndroidAutoDpi: IntConfig("AndroidAutoDpi", 0)
     object DelayDestroyTime: IntConfig("DelayDestroyTime", 180)

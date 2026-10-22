@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.23.13 (2026-10-22)
+
+### Changed
+- Version updated to `versionName` `0.23#17.8-r14`, `versionCode` `3029`.
+- Removed the Waze integration entirely: the "Disable Waze on AA" toggle, its persisted config
+  option, UI row and strings, the Waze content-provider hook, the component/global-setting manager,
+  and the Waze entry in the LSPosed scope. Google Maps support was already removed in v0.23.11, so
+  the module no longer ties into any navigation app. Waze behaves as a normal, untied app.
+- Floating controller: the close ("X") button is now a **session kill switch**. It runs the standard
+  teardown (the same countdown path used when the car disconnects). Pressing "X" again during the
+  countdown **cancels** the teardown and keeps the session; tapping the countdown kills immediately.
+- Tucking the controller is now a **gesture**: drag it off the screen edge to tuck it to the peek,
+  with a smooth slide animation. The controller also now stays **wherever you drop it** (free
+  placement; it no longer snaps to the nearest side).
+- When the mirror session is destroyed, Android Auto now **returns to its native launcher
+  automatically** (via `CarActivityHost.finish()`) instead of freezing on the dead mirror surface.
+  It returns home immediately on a real kill; a session restart (old display replaced by a new one)
+  is detected and left running.
+
+### Verification
+- Confirmed on a connected Desktop Head Unit and the owner's device: kill returns to the Android Auto
+  launcher near-instantly, cancel works, the tuck slides smoothly, the controller free-drags and
+  stays put, Waze is restored to normal on-device, and session restart still works.
+
+## 0.23.12 (2026-10-18)
+
+### Changed
+- Version updated to `versionName` `0.23#17.8-r8`, `versionCode` `3023`.
+- Replaced the Android Auto Coolwalk facet-bar microphone/assistant slot with the AADisplay Home
+  button, keeping the rest of Android Auto's native vertical rail intact (recents, AA's own Home
+  button, and the recent-apps dock). Implemented as a single opaque overlay on the assistant slot
+  (no bar rebuild, no per-frame listeners), so there is no projection-encoder frame backlog.
+
+### Verification
+- Confirmed on a connected Desktop Head Unit: only the Home icon shows in the slot, the native bar
+  is intact, and no frames are dropped.
+
 ## 0.23.11 (2026-10-18)
 
 ### Changed

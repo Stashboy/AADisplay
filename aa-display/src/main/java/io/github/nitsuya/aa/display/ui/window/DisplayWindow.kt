@@ -1,5 +1,8 @@
 package io.github.nitsuya.aa.display.ui.window
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -7,6 +10,7 @@ import android.content.IntentFilter
 import android.content.pm.ActivityInfo
 import android.graphics.PixelFormat
 import android.os.CountDownTimer
+import android.view.animation.DecelerateInterpolator
 import android.os.PowerManager
 import android.provider.Settings
 import android.view.*
@@ -42,6 +46,7 @@ class DisplayWindow(
     , private var mDisplayWidth: Int
     , private var mDisplayHeight: Int
     , private var mDensityDpi: Int
+    , private val onRequestDestroy: () -> Unit = {}
 ): View.OnTouchListener {
     companion object {
         private const val TAG = "AADisplay_DisplayWindow"
@@ -165,7 +170,15 @@ class DisplayWindow(
                 expandController()
             }
             ibHideController.setOnClickListener {
-                collapseController()
+                // Toggle session teardown. First press starts the standard teardown (same path as
+                // car-off): the monitor icon turns into a countdown you can tap to kill instantly.
+                // Pressing X again while the countdown runs CANCELS the teardown and keeps the
+                // session alive. (To just tuck the toolbar away, slide it off the screen edge.)
+                if (mDestroyJob?.isActive == true) {
+                    abortDestroy()
+                } else {
+                    onRequestDestroy()
+                }
             }
             if(mScreenOffReplaceLockScreen){
                 ibExtinguish.visibility = View.VISIBLE
@@ -395,6 +408,19 @@ class DisplayWindow(
         }
     }
 
+    // Cancel an in-progress teardown (started by the X button) and keep the session alive. The
+    // countdown has not destroyed anything yet, so this just stops the timer, restores the toolbar
+    // (countdown -> monitor icon), and re-acquires what onDestroy released (screen-bright monitor).
+    private fun abortDestroy() {
+        mDestroyJob?.cancel()
+        mDestroyJob = null
+        mControllerBinding?.apply {
+            tvDestroyTime.visibility = View.GONE
+            ibMirrorDisplay.visibility = View.VISIBLE
+        }
+        interactiveMonitor.init()
+    }
+
     fun toggleDisplayPower(displayPower: Boolean = !mDisplayPower){
         try {
             if(mScreenOffReplaceLockScreen){
@@ -488,11 +514,53 @@ class DisplayWindow(
         setControllerCollapsed(true)
     }
 
+    private var mDockAnimator: ValueAnimator? = null
+
     private fun setControllerCollapsed(collapsed: Boolean) {
-        mControllerCollapsed = collapsed
-        applyControllerCollapsedState()
-        mControllerBinding?.root?.post {
-            applyControllerDockPosition()
+        val binding = mControllerBinding ?: return
+        val displayMetrics = mContext.resources.displayMetrics
+        if (collapsed) {
+            // Slide the panel toward the dock edge (leaving only the peek), then swap to the handle
+            // -- a smooth tuck like the native OnePlus sidebar rather than an instant jump.
+            val panelWidth = getControllerVisibleWidth(binding)
+            val targetX = if (mControllerDockRight) {
+                displayMetrics.widthPixels - mControllerPeekPx
+            } else {
+                -(panelWidth - mControllerPeekPx)
+            }
+            animateControllerX(targetX) {
+                mControllerCollapsed = true
+                applyControllerCollapsedState()
+                binding.root.post { applyControllerDockPosition() }
+            }
+        } else {
+            // Show the panel at the current (tucked) edge, then slide it out to its full position.
+            mControllerCollapsed = false
+            applyControllerCollapsedState()
+            binding.root.post {
+                val panelWidth = getControllerVisibleWidth(binding)
+                val targetX = if (mControllerDockRight) displayMetrics.widthPixels - panelWidth else 0
+                animateControllerX(targetX)
+            }
+        }
+    }
+
+    private fun animateControllerX(targetX: Int, onEnd: (() -> Unit)? = null) {
+        val binding = mControllerBinding ?: run { onEnd?.invoke(); return }
+        mDockAnimator?.cancel()
+        val startX = mControllerLayoutParams.x
+        if (startX == targetX) { onEnd?.invoke(); return }
+        mDockAnimator = ValueAnimator.ofInt(startX, targetX).apply {
+            duration = 220
+            interpolator = DecelerateInterpolator()
+            addUpdateListener { a ->
+                mControllerLayoutParams.x = a.animatedValue as Int
+                tryOrNull { Instances.windowManager.updateViewLayout(binding.root, mControllerLayoutParams) }
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) { onEnd?.invoke() }
+            })
+            start()
         }
     }
 
@@ -575,6 +643,7 @@ class DisplayWindow(
                         setTag(R.id.drag_distance, 0f)
                     }
                     mChangeAlphaCountDownTimer.cancel()
+                    mDockAnimator?.cancel()
                     ViewCompat.animate(root).setDuration(200).alpha(0.9f).start()
                 }
                 MotionEvent.ACTION_MOVE -> {
@@ -609,8 +678,29 @@ class DisplayWindow(
                 MotionEvent.ACTION_UP -> {
                     isDrag = v.getTag(R.id.is_drag) as Boolean
                     val displayMetrics = mContext.resources.displayMetrics
-                    mControllerDockRight = event.rawX > (displayMetrics.widthPixels / 2f)
-                    applyControllerDockPosition()
+                    val visibleWidth = getControllerVisibleWidth(this)
+                    val visibleHeight = getControllerVisibleHeight(this)
+                    val draggedX = mControllerLayoutParams.x
+                    val slidOffRight = draggedX + visibleWidth > displayMetrics.widthPixels + mControllerPeekPx
+                    val slidOffLeft = draggedX < -mControllerPeekPx
+                    if (isDrag && !mControllerCollapsed && (slidOffRight || slidOffLeft)) {
+                        // Expanded toolbar slid off an edge -> tuck to that edge.
+                        mControllerDockRight = slidOffRight
+                        setControllerCollapsed(true)
+                    } else if (mControllerCollapsed) {
+                        // Collapsed handle stays docked at the peek on the nearer edge.
+                        mControllerDockRight = event.rawX > (displayMetrics.widthPixels / 2f)
+                        applyControllerDockPosition()
+                    } else {
+                        // Expanded: free placement -- stay wherever dropped (no edge snap), only
+                        // clamped fully on-screen so the toolbar can never be lost off an edge.
+                        mControllerDockRight = (draggedX + visibleWidth / 2f) > (displayMetrics.widthPixels / 2f)
+                        mControllerLayoutParams.x = draggedX.coerceIn(
+                            0, (displayMetrics.widthPixels - visibleWidth).coerceAtLeast(0))
+                        mControllerLayoutParams.y = mControllerLayoutParams.y.coerceIn(
+                            0, (displayMetrics.heightPixels - visibleHeight).coerceAtLeast(0))
+                        tryOrNull { Instances.windowManager.updateViewLayout(root, mControllerLayoutParams) }
+                    }
                     mChangeAlphaCountDownTimer.start()
                 }
             }

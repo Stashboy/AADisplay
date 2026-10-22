@@ -27,7 +27,6 @@ Fork of [Nitsuya/AADisplay](https://github.com/Nitsuya/AADisplay), with a produc
 3. Reboot device.
 4. Open AADisplay and configure:
     - Auto Open
-    - Disable Waze on AA
     - Default Launch Package
     - Delay Destroy Time
 

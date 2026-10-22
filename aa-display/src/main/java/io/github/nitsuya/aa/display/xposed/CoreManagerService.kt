@@ -246,7 +246,8 @@ class CoreManagerService private constructor(): ICoreManager.Stub() {
                         this,
                         profile.width,
                         profile.height,
-                        profile.densityDpi
+                        profile.densityDpi,
+                        onRequestDestroy = { this@CoreManagerService.onDestroyDisplay() }
                     )
                 } finally {
                     mDisplayCreateInProgress = false

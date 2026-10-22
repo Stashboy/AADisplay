@@ -3,6 +3,9 @@ package io.github.nitsuya.aa.display.ui.aa.fragment
 import android.annotation.SuppressLint
 import android.content.*
 import android.graphics.SurfaceTexture
+import android.hardware.display.DisplayManager
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.support.car.Car
 import android.support.car.CarConnectionCallback
@@ -17,6 +20,7 @@ import com.topjohnwu.superuser.Shell
 import io.github.duzhaokun123.template.bases.BaseFragment
 import io.github.nitsuya.aa.display.CoreApi
 import io.github.nitsuya.aa.display.databinding.FragmentAaMainBinding
+import io.github.nitsuya.aa.display.ui.aa.AaDisplayActivity
 import io.github.nitsuya.aa.display.ui.aa.AaDisplayActivityKt
 import io.github.nitsuya.aa.display.util.AABroadcastConst
 import io.github.nitsuya.aa.display.util.AADisplayConfig
@@ -37,6 +41,10 @@ class AaMainFragment : BaseFragment<FragmentAaMainBinding>(FragmentAaMainBinding
     private var repairDownTime = Long.MIN_VALUE
     private var isForeground = false
     private var isDisplayCreateRequested = false
+    // True between asking CoreManager to create a display and the display becoming available.
+    // Distinguishes a session (re)create (a new display is coming) from a kill (none is), so the
+    // return-to-home can fire immediately on a kill instead of waiting out a timer.
+    private var createInFlight = false
     private var isControlReceiverRegistered = false
     private var displaySurface: Surface? = null
     private lateinit var config: SharedPreferences
@@ -56,6 +64,35 @@ class AaMainFragment : BaseFragment<FragmentAaMainBinding>(FragmentAaMainBinding
 
     fun startActivity(){
         carManager.startCarAaDisplay()
+    }
+
+    // The mirror virtual display is PUBLIC, so this process is notified when it is removed (e.g.
+    // the phone-side kill switch tears it down). Without this, the AA screen keeps showing the dead
+    // mirror surface and freezes. On removal of our display, return AA to its native launcher.
+    private var displayManager: DisplayManager? = null
+    private val displayListener = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(addedId: Int) {}
+        override fun onDisplayChanged(changedId: Int) {}
+        override fun onDisplayRemoved(removedId: Int) {
+            if (removedId != Display.INVALID_DISPLAY && removedId == displayId) {
+                displayId = Display.INVALID_DISPLAY
+                if (!createInFlight) {
+                    // No display (re)create is pending -> this is a kill. Return home immediately.
+                    Log.i(TAG, "virtual display $removedId removed, no pending create; returning home now")
+                    tryOrNull { AaDisplayActivity.current?.goHome() }
+                } else {
+                    // A session (re)create is in flight -> a new display is coming, so do not finish.
+                    // Safety net: if no new display actually arrives (aborted create), go home later.
+                    Log.i(TAG, "virtual display $removedId removed during a pending create; deferring")
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        if (displayId == Display.INVALID_DISPLAY) {
+                            Log.i(TAG, "no new display arrived after pending create; returning home")
+                            tryOrNull { AaDisplayActivity.current?.goHome() }
+                        }
+                    }, 1000)
+                }
+            }
+        }
     }
 
     private val broadcastReceiver = object : BroadcastReceiver() {
@@ -144,6 +181,9 @@ class AaMainFragment : BaseFragment<FragmentAaMainBinding>(FragmentAaMainBinding
         car = Car.createCar(this.requireContext(), carConnectionCallback).apply {
             connect()
         }
+
+        displayManager = ContextCompat.getSystemService(requireContext(), DisplayManager::class.java)
+        tryOrNull { displayManager?.registerDisplayListener(displayListener, Handler(Looper.getMainLooper())) }
     }
 
     override fun onResume() {
@@ -167,6 +207,7 @@ class AaMainFragment : BaseFragment<FragmentAaMainBinding>(FragmentAaMainBinding
     override fun onDestroy() {
         super.onDestroy()
         Log.i(TAG, "onDestroy: displayId=$displayId")
+        tryOrNull { displayManager?.unregisterDisplayListener(displayListener) }
         clearDisplaySurface("destroy")
         CoreApi.onDestroyDisplay()
         if (isControlReceiverRegistered) tryOrNull {
@@ -196,6 +237,7 @@ class AaMainFragment : BaseFragment<FragmentAaMainBinding>(FragmentAaMainBinding
         @SuppressLint("ClickableViewAccessibility")
         override fun onAvailableDisplay(displayId: Int, create: Boolean) {
             Log.i(TAG, "onAvailableDisplay: displayId=$displayId create=$create surfaceAvailable=${baseBinding.tvDisplay.isAvailable}")
+            createInFlight = false
             this@AaMainFragment.displayId = displayId
             runMain {
                 attachDisplaySurface("available")
@@ -252,6 +294,7 @@ class AaMainFragment : BaseFragment<FragmentAaMainBinding>(FragmentAaMainBinding
         }
 
         isDisplayCreateRequested = true
+        createInFlight = true
         CoreApi.onCreateDisplay(displayWidth, displayHeight, displayDpi, surface, displayCreatedListener)
     }
 
