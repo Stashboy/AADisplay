@@ -37,7 +37,7 @@ import com.github.kyuubiran.ezxhelper.init.EzXHelperInit;
 
 import java.util.Objects;
 
-import io.github.nitsuya.aa.display.R;
+import io.github.stashboy.aa.pwned.R;
 import io.github.qauxv.util.SavedInstanceStatePatchedClassReferencer;
 
 /**

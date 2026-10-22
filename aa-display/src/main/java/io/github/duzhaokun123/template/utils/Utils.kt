@@ -5,7 +5,7 @@ import android.content.res.Resources
 import android.util.TypedValue
 import androidx.annotation.AttrRes
 import androidx.core.view.WindowInsetsCompat
-import io.github.nitsuya.aa.display.App
+import io.github.stashboy.aa.pwned.App
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope

@@ -10,8 +10,8 @@ import androidx.core.view.isVisible
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.BaseTransientBottomBar
 import com.google.android.material.snackbar.Snackbar
-import io.github.nitsuya.aa.display.R
-import io.github.nitsuya.aa.display.App
+import io.github.stashboy.aa.pwned.R
+import io.github.stashboy.aa.pwned.App
 
 object TipUtil {
     private val map = mutableMapOf<Int, CoordinatorLayout>()

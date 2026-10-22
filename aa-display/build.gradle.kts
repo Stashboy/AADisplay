@@ -10,11 +10,11 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "io.github.nitsuya.aa.display"
+        applicationId = "io.github.stashboy.aa.pwned"
         minSdk = 31
         targetSdk = 36
-        versionCode = 3029
-        versionName = "0.23#17.8-r14"
+        versionCode = 3030
+        versionName = "0.23#17.8-r15"
         buildConfigField("long", "BUILD_TIME", buildTime.toString())
     }
 
@@ -69,7 +69,7 @@ android {
         variant.outputs.all {
             val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
             val versionName = variant.versionName.replace("#", "-")
-            output.outputFileName = "aa-display-${versionName}.apk"
+            output.outputFileName = "aapwned-${versionName}.apk"
         }
     }
     
@@ -93,7 +93,7 @@ android {
 
     androidResources.additionalParameters += mutableListOf("--allow-reserved-package-id", "--package-id", "0x64")
 
-    namespace = "io.github.nitsuya.aa.display"
+    namespace = "io.github.stashboy.aa.pwned"
     buildToolsVersion = "35.0.0"
 }
 

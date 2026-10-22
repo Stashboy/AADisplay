@@ -5,4 +5,4 @@ pluginManagement {
 }
 
 include(":aa-display", ":lib-stub")//, ":lib-aasdk"
-rootProject.name = "AADisplay"
+rootProject.name = "AAPwned"

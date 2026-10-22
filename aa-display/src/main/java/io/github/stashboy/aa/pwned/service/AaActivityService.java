@@ -1,0 +1,47 @@
+package io.github.stashboy.aa.pwned.service;
+
+import android.content.pm.ActivityInfo;
+import android.util.Log;
+import com.google.android.apps.auto.sdk.CarActivity;
+import com.google.android.apps.auto.sdk.CarActivityService;
+import io.github.stashboy.aa.pwned.ui.aa.AaDisplayActivity;
+
+public class AaActivityService extends CarActivityService {
+    private static final String TAG = "AADisplay_AaActivityService";
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        Log.i(TAG, "onCreate");
+    }
+
+    @Override
+    public Class<? extends CarActivity> getCarActivity() {
+        Log.i(TAG, "getCarActivity");
+        return AaDisplayActivity.class;
+    }
+
+    @Override
+    public int getHandledConfigChanges() {
+        Log.i(TAG, "getHandledConfigChanges");
+        return ActivityInfo.CONFIG_MCC
+                | ActivityInfo.CONFIG_MNC
+                | ActivityInfo.CONFIG_LOCALE
+                | ActivityInfo.CONFIG_TOUCHSCREEN
+                | ActivityInfo.CONFIG_KEYBOARD
+                | ActivityInfo.CONFIG_KEYBOARD_HIDDEN
+                | ActivityInfo.CONFIG_NAVIGATION
+                | ActivityInfo.CONFIG_ORIENTATION
+                | ActivityInfo.CONFIG_SCREEN_LAYOUT
+                | ActivityInfo.CONFIG_UI_MODE
+                | ActivityInfo.CONFIG_SCREEN_SIZE
+                | ActivityInfo.CONFIG_SMALLEST_SCREEN_SIZE
+                | ActivityInfo.CONFIG_DENSITY
+                | ActivityInfo.CONFIG_LAYOUT_DIRECTION
+                | ActivityInfo.CONFIG_COLOR_MODE
+                | ActivityInfo.CONFIG_FONT_SCALE
+                | ActivityInfo.CONFIG_FONT_WEIGHT_ADJUSTMENT
+        ;
+    }
+
+}

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.23.14 (2026-10-22)
+
+### Changed
+- Version updated to `versionName` `0.23#17.8-r15`, `versionCode` `3030`.
+- **Rebranded from AADisplay to AAPwned**, and renamed the application package from
+  `io.github.nitsuya.aa.display` to `io.github.stashboy.aa.pwned`. The module label, Xposed
+  description, launcher name, and in-app text now read "AAPwned"; the release asset is now
+  `aapwned-<version>.apk`.
+- No functional changes — behavior is identical to v0.23.13.
+
+### Note
+- Because the application package changed, this installs as a **new** module. Uninstall AADisplay,
+  install AAPwned, re-enable it in LSPosed, re-grant its scope, and reboot; prior settings do not
+  carry over.
+
+### Credits
+- AAPwned remains a fork of [Nitsuya/AADisplay](https://github.com/Nitsuya/AADisplay); credit for the
+  original module is in the README (deliberately not in the installed package listing). Bundled
+  template/helper code from duzhaokun123 and QAuxiliary (cinit) is retained under their licenses.
+
 ## 0.23.13 (2026-10-22)
 
 ### Changed

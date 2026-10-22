@@ -1,8 +1,8 @@
 <resources>
-    <string name="app_name">AADisplay</string>
+    <string name="app_name">AAPwned</string>
     <string name="unknown_error">unknown error</string>
     <string name="details">details</string>
-    <string name="xposeddescription">AADisplay</string>
+    <string name="xposeddescription">AAPwned</string>
     <string name="info_system_version">System Version</string>
     <string name="info_root_privilege">Root Privilege</string>
     <string name="activated">Activated</string>
@@ -13,7 +13,7 @@
     <string name="auto_open_title">Auto Open</string>
     <string name="auto_open_summary">Automatically open app when Android Auto is connected</string>
     <string name="default_launch_package_title">Default Launch Package</string>
-    <string name="default_launch_package_summary">App package launched when AADisplay starts</string>
+    <string name="default_launch_package_summary">App package launched when AAPwned starts</string>
     <string name="default_launch_package_empty">Default Launch Package is required</string>
     <string name="default_home_detected">Default Home Launcher: %1$s</string>
     <string name="default_home_unknown">Default Home Launcher: Not detected</string>

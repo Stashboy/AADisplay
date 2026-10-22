@@ -19,8 +19,8 @@ import androidx.core.view.updatePadding
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.viewbinding.ViewBinding
-import io.github.nitsuya.aa.display.R
-import io.github.nitsuya.aa.display.databinding.ActivityBaseRoot2Binding
+import io.github.stashboy.aa.pwned.R
+import io.github.stashboy.aa.pwned.databinding.ActivityBaseRoot2Binding
 import io.github.nitsuya.template.bases.TipUtil
 import io.github.nitsuya.template.bases.maxSystemBarsDisplayCutout
 import net.matsudamper.viewbindingutil.ViewBindingUtil
