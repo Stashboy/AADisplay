@@ -17,6 +17,7 @@ import io.github.stashboy.aa.pwned.xposed.hook.aa.AaDpiHook
 import io.github.stashboy.aa.pwned.xposed.hook.aa.AaPropsHook
 import io.github.stashboy.aa.pwned.xposed.hook.aa.AaSignatureHook
 import io.github.stashboy.aa.pwned.xposed.hook.aa.AaUiHook
+import io.github.stashboy.aa.pwned.xposed.hook.aa.AaWazeHook
 import io.github.stashboy.aa.pwned.xposed.log
 import org.luckypray.dexkit.DexKitBridge
 import kotlin.system.measureTimeMillis
@@ -38,7 +39,7 @@ object AndroidAuoHook : BaseHook() {
     override val tagName: String = "AAD_AndroidAuoHook"
     override fun init(lpparam: XC_LoadPackage.LoadPackageParam) {
         val processName = lpparam.processName
-        val hooks = listOf(AaBasicsHook, AaSignatureHook, AaDpiHook, AaBtnEventHook, AaUiHook, AaPropsHook).filter { i -> i.isSupportProcess(processName) }
+        val hooks = listOf(AaBasicsHook, AaSignatureHook, AaDpiHook, AaBtnEventHook, AaUiHook, AaPropsHook, AaWazeHook).filter { i -> i.isSupportProcess(processName) }
         if(hooks.isEmpty()) return
 
         val configPreferences = XSharedPreferences(BuildConfig.APPLICATION_ID, AADisplayConfig.ConfigName)

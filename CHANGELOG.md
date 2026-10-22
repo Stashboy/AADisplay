@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.23.15 (2026-10-22)
+
+### Fixed
+- **Activation fix (regression from v0.23.14).** The v0.23.14 rename missed the extensionless
+  `assets/xposed_init` entry file, which still pointed at the old `io.github.nitsuya.aa.display`
+  entry class. LSPosed could not find the module entry point, so v0.23.14 installed as **Not
+  Activated** and hooked nothing. `xposed_init` now points at
+  `io.github.stashboy.aa.pwned.xposed.XposedInit`; the module activates and hooks normally.
+
+### Added
+- **"Disable Waze on Android Auto" toggle (re-implemented).** When enabled, Waze keeps its map on
+  the phone (visible on-device) while connected to Android Auto, instead of projecting to the car
+  head unit, and is hidden from the Android Auto app list. When disabled, Waze projects to Android
+  Auto as normal.
+  - Implemented entirely **Android Auto-side**: a hook on Android Auto's own car-connection provider
+    (`androidx.car.app.connection` / `ProjectionStateProvider`) reports "not connected" to **Waze
+    only** (by calling package), so Waze runs on the phone; every other app still sees the true
+    connection state. A second hook drops Waze from Android Auto's app discovery.
+  - Uses only stable framework APIs and the `com.waze` package name — **no Waze code is hooked and
+    no Waze offsets are used**, so Waze app updates do not affect it. The toggle is read live (no
+    reboot needed to change it once the module is loaded).
+
+### Changed
+- Version updated to `versionName` `0.23#17.8-r19`, `versionCode` `3034`.
+- Hardened the app-list filter so it only rewrites a multi-resolver query result and never returns an
+  empty list, so no gearhead caller that dereferences the first result can crash.
+
+### Verification
+- Confirmed on the owner's device and in-vehicle: with the toggle on, Waze's map stays on the phone
+  while Android Auto is connected and Waze does not appear or run on the car screen; with it off,
+  Waze projects to Android Auto normally. Module reports **Activated** after the `xposed_init` fix.
+
 ## 0.23.14 (2026-10-22)
 
 ### Changed

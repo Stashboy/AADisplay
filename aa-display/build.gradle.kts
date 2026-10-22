@@ -13,8 +13,8 @@ android {
         applicationId = "io.github.stashboy.aa.pwned"
         minSdk = 31
         targetSdk = 36
-        versionCode = 3030
-        versionName = "0.23#17.8-r15"
+        versionCode = 3034
+        versionName = "0.23#17.8-r19"
         buildConfigField("long", "BUILD_TIME", buildTime.toString())
     }
 
