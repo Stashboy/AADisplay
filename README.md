@@ -27,8 +27,8 @@ AAPwned is a fork of **[Nitsuya/AADisplay](https://github.com/Nitsuya/AADisplay)
 
 ## Version
 
-- Current module version: `0.23#17.8-r19` (Android Auto target 17.8 / 17.9)
-- See [CHANGELOG.md](CHANGELOG.md) and the latest release notes (e.g. `RELEASE_NOTES_v0.23.15.md`).
+- Current module version: `0.23#17.8-r20` (Android Auto target 17.8 / 17.9)
+- See [CHANGELOG.md](CHANGELOG.md) and the latest release notes (e.g. `RELEASE_NOTES_v0.23.16.md`).
 
 ## Requirements
 
@@ -47,8 +47,9 @@ AAPwned is a fork of **[Nitsuya/AADisplay](https://github.com/Nitsuya/AADisplay)
     - Auto Open
     - Default Launch Package
     - Delay Destroy Time
-    - Disable Waze on Android Auto — keeps Waze on the phone (map on-device) while connected,
-      instead of projecting to the car. Entirely Android Auto-side; no Waze changes required.
+    - Disable Waze on Android Auto — keeps Waze's map on the phone while connected instead of
+      auto-projecting to the car (Waze still opens on the car if you launch it there). Entirely
+      Android Auto-side; no Waze changes required.
 
 ## Build
 

@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.23.16 (2026-10-22)
+
+### Changed
+- Version updated to `versionName` `0.23#17.8-r20`, `versionCode` `3035`.
+- **"Disable Waze on Android Auto" simplified to the mechanism that actually works.** The feature now
+  relies solely on the car-connection intercept (Waze is told it is not connected, so it keeps its
+  map on the phone). The secondary app-list filter was **removed**: it hooked
+  `queryIntentServices/queryIntentActivities` inside the Android Auto process, but Android Auto's
+  Coolwalk launcher builds its app grid from a car-app registry enumerated by Google Play services
+  (a process this module does not hook), so the filter never hid Waze and only added per-call work on
+  hot code paths.
+- **Corrects v0.23.15's note** that Waze is "hidden from the Android Auto app list" — that never
+  worked. Waze remains listed and can still be launched explicitly on the car; an explicit launch
+  projects normally (it is not governed by the connection signal).
+- **Performance:** the toggle value is now cached and refreshed at most once per second instead of
+  re-reading the config file from disk on every intercepted call, and the per-call log on the
+  intercept path was removed. Removes per-call disk I/O on Android Auto's hot paths.
+- Hardened the connection-intercept cursor to read the query projection from its fixed argument
+  position rather than guessing the first string array.
+
+### Notes
+- Investigated a projection "frames backlog" reported by the Desktop Head Unit. It is **inherent
+  decode load** — high-motion content (e.g. YouTube) mirrored at the head unit's resolution produces
+  frame bursts the DHU's software decoder cannot keep up with. It is not caused by this module (it
+  persists with the Waze hook's per-call work removed, and is triggered by content, not the hook).
+  No change made.
+
 ## 0.23.15 (2026-10-22)
 
 ### Fixed
